@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -16,7 +17,7 @@ void init_conf_file(int ac, char **av, std::string &filename) {
 }
 
 int main(int argc, char *argv[]) {
-  // This is a simple demo
-
+  std::string config_file;
+  init_conf_file(argc, argv, config_file);
   return 0;
 }
