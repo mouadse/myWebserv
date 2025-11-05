@@ -29,11 +29,46 @@ std::string read_config_file(const std::string &file_path) {
                           file_path + "'). " + std::string(strerror(errno));
     throw std::runtime_error(err_msg);
   }
-  return "";
+  // Check if the provided path is a regular file
+  if (!S_ISREG(st.st_mode)) {
+    std::string err_msg =
+        "Error: The path '" + file_path + "' is not a regular file.";
+    throw std::runtime_error(err_msg);
+  }
+  std::ifstream file_stream(file_path.c_str());
+  if (!file_stream.is_open()) {
+    std::string err_msg = "Error: Unable to open the configuration file ('" +
+                          file_path + "'). " + std::string(strerror(errno));
+    throw std::runtime_error(err_msg);
+  }
+  std::string file_content;
+  std::string line;
+  while (std::getline(file_stream, line)) {
+    // Optional: strip Windows CR if present to normalize line endings.
+    if (!line.empty() && line[line.size() - 1] == '\r') {
+      line.erase(line.size() - 1);
+    }
+    file_content += line;
+    file_content.push_back('\n'); // preserve your original behavior
+  }
+  if (file_stream.bad()) {
+    std::string err_msg = "Error: An error occurred while reading the file ('" +
+                          file_path + "'). " + std::string(strerror(errno));
+    throw std::runtime_error(err_msg);
+  }
+  file_stream.close();
+  return file_content;
 }
 
 int main(int argc, char *argv[]) {
   std::string config_file;
   init_conf_file(argc, argv, config_file);
-  return 0;
+  try {
+    std::string config_content = read_config_file(config_file);
+    std::cout << "Configuration file content:\n" << config_content << std::endl;
+  } catch (const std::runtime_error &e) {
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
 }
