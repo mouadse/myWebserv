@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
+#include <vector>
 
 void init_conf_file(int ac, char **av, std::string &filename) {
   // We will be having 3 cases: one no ac it means we will use the default
@@ -60,12 +61,80 @@ std::string read_config_file(const std::string &file_path) {
   return file_content;
 }
 
+// Time to build a tokenizer that will help us parse the config file
+
+std::vector<std::string> tokenize_config_file(std::string const &content) {
+  std::vector<std::string> tokens;
+  std::string currentToken;
+
+  bool is_delim[256];
+  std::memset(is_delim, 0, sizeof(is_delim));
+  is_delim[static_cast<unsigned char>('{')] = true;
+  is_delim[static_cast<unsigned char>('}')] = true;
+  is_delim[static_cast<unsigned char>(';')] = true;
+
+  for (std::string::const_iterator it = content.begin(); it != content.end();
+       ++it) {
+    char ch = *it;
+
+    if (is_delim[static_cast<unsigned char>(ch)]) {
+      if (!currentToken.empty()) {
+        tokens.push_back(currentToken);
+        currentToken.clear();
+      }
+      tokens.push_back(std::string(1, ch));
+    } else if (std::isspace(static_cast<unsigned char>(ch))) {
+      if (!currentToken.empty()) {
+        tokens.push_back(currentToken);
+        currentToken.clear();
+      }
+    } else if (ch == '"' && currentToken.empty()) {
+      // Start of a quoted string (only allowed when not in the middle of a
+      // token)
+      ++it;
+      while (it != content.end() && *it != '"') {
+        currentToken += *it;
+        ++it;
+      }
+      if (it == content.end()) {
+        throw std::runtime_error(
+            "unexpected end of file, expecting \";\" or \"}\"");
+      }
+      tokens.push_back(currentToken);
+      currentToken.clear();
+    } else if (ch == '#') {
+      // Comment: flush token, then skip until newline
+      if (!currentToken.empty()) {
+        tokens.push_back(currentToken);
+        currentToken.clear();
+      }
+      while (it != content.end() && *it != '\n') {
+        ++it;
+      }
+      // The for-loop's ++it will move past '\n' on the next iteration
+    } else {
+      currentToken += ch;
+    }
+  }
+
+  if (!currentToken.empty()) {
+    tokens.push_back(currentToken);
+  }
+  return tokens;
+}
+
 int main(int argc, char *argv[]) {
   std::string config_file;
   init_conf_file(argc, argv, config_file);
   try {
     std::string config_content = read_config_file(config_file);
-    std::cout << "Configuration file content:\n" << config_content << std::endl;
+
+    std::vector<std::string> tokens = tokenize_config_file(config_content);
+    // For demonstration, print the tokens
+    for (size_t i = 0; i < tokens.size(); ++i) {
+      std::cout << "Token " << i << ": " << tokens[i] << std::endl;
+    }
+
   } catch (const std::runtime_error &e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
