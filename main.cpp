@@ -112,6 +112,89 @@ std::vector<std::string> tokenize_config_file(std::string const &content) {
   return tokens;
 }
 
+// Time to validate the syntax of the config file
+// The steps will be as follows:
+// 1. Check for matching braces
+// 2. Ensure directives end with a semicolon
+// 3. Validate known directives and their context
+
+static void validateBraces(const std::vector<std::string> &tokens) {
+  // Code goes here
+  if (tokens.empty()) {
+    throw std::runtime_error("Error: Empty configuration file.");
+  }
+
+  std::size_t depth = 0;
+
+  for (std::size_t i = 0; i < tokens.size(); ++i) {
+    const std::string &token = tokens[i];
+
+    if (token == "{") {
+      // Reject leading '{' with no context.
+      if (i == 0) {
+        throw std::runtime_error("Error: Unexpected opening brace.");
+      }
+
+      const std::string &prev = tokens[i - 1];
+
+      // Reject consecutive '{' tokens.
+      if (prev == "{") {
+        throw std::runtime_error("Error: Unexpected opening brace.");
+      }
+
+      // Reject patterns like '} ... {' according to legacy rules.
+      if (prev == "}") {
+        if (i < 2) {
+          throw std::runtime_error("Error: Unexpected opening brace.");
+        }
+        const std::string &beforePrev = tokens[i - 2];
+        if (beforePrev.find_first_not_of("server") == std::string::npos) {
+          throw std::runtime_error("Error: Unexpected closing brace.");
+        }
+        throw std::runtime_error("Error: Unexpected opening brace.");
+      }
+
+      // Track nesting depth for later validation.
+      ++depth;
+
+      // Configuration cannot terminate immediately after an opening brace.
+      if (i + 1 == tokens.size()) {
+        throw std::runtime_error("Error: Unexpected closing brace.");
+      }
+    } else if (token == "}") {
+      // Detect a stray '}' without a matching '{'.
+      if (depth == 0) {
+        throw std::runtime_error("Error: Unexpected closing brace.");
+      }
+      --depth;
+    }
+  }
+
+  // Any leftover depth indicates at least one unmatched '{'.
+  if (depth != 0) {
+    throw std::runtime_error("Error: Unmatched opening brace.");
+  }
+}
+
+static void validateRequiredContexts(const std::vector<std::string> &tokens) {
+  // Code goes here
+}
+
+static void validateContexts(const std::vector<std::string> &tokens) {
+  // Code goes here
+}
+
+static void validateDirectives(const std::vector<std::string> &tokens) {
+  // Code goes here
+}
+
+void validate_syntax(const std::vector<std::string> &tokens) {
+  // validateBraces(tokens);
+  // validateRequiredContexts(tokens);
+  // validateContexts(tokens);
+  // validateDirectives(tokens);
+}
+
 int main(int argc, char *argv[]) {
   std::string config_file;
   init_conf_file(argc, argv, config_file);
