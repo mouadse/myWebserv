@@ -462,6 +462,7 @@ static bool ensureExecutable(const std::string &path)
 	return true;
 }
 
+<<<<<<< HEAD
 int main(int argc, char **argv)
 {
 	if (argc < 2)
@@ -599,4 +600,23 @@ int main(int argc, char **argv)
 		unlink(postBodyPath.c_str());
 
 	return 0;
+=======
+int main(int argc, char *argv[]) {
+  std::string config_file;
+  init_conf_file(argc, argv, config_file);
+  try {
+    std::string config_content = read_config_file(config_file);
+
+    std::vector<std::string> tokens = tokenize_config_file(config_content);
+    // For demonstration, print the tokens
+    for (size_t i = 0; i < tokens.size(); ++i) {
+      std::cout << "Token " << i << ": " << tokens[i] << std::endl;
+    }
+
+  } catch (const std::runtime_error &e) {
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
+>>>>>>> parent of dde42b6 (Working on the syntax validator for our conf file)
 }
