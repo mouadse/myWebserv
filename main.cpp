@@ -238,7 +238,7 @@ static void validateDirectives(const std::vector<std::string> &tokens) {
 }
 
 void validate_syntax(const std::vector<std::string> &tokens) {
-  validateBraces(tokens); // First validate matching braces done ✅
+  validateBraces(tokens);
   validateRequiredContexts(tokens);
   validateContexts(tokens);
   validateDirectives(tokens);
