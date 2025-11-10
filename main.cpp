@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -177,8 +178,13 @@ static void validateBraces(const std::vector<std::string> &tokens) {
 }
 
 static void validateRequiredContexts(const std::vector<std::string> &tokens) {
-  (void)tokens;
-  // Code goes here
+  if (std::find(tokens.begin(), tokens.end(), "http") == tokens.end()) {
+    throw std::runtime_error("Error: Missing required 'http' context.");
+    if (std::find(tokens.begin(), tokens.end(), "server") == tokens.end()) {
+      throw std::runtime_error("Error: Missing required 'server' context.");
+    }
+    
+  }
 }
 
 static void validateContexts(const std::vector<std::string> &tokens) {
@@ -192,7 +198,7 @@ static void validateDirectives(const std::vector<std::string> &tokens) {
 }
 
 void validate_syntax(const std::vector<std::string> &tokens) {
-  validateBraces(tokens);
+  validateBraces(tokens); // First validate matching braces done ✅
   validateRequiredContexts(tokens);
   validateContexts(tokens);
   validateDirectives(tokens);
