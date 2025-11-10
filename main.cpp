@@ -178,12 +178,52 @@ static void validateBraces(const std::vector<std::string> &tokens) {
 }
 
 static void validateRequiredContexts(const std::vector<std::string> &tokens) {
+  // Ensure required top-level contexts exist
   if (std::find(tokens.begin(), tokens.end(), "http") == tokens.end()) {
     throw std::runtime_error("Error: Missing required 'http' context.");
-    if (std::find(tokens.begin(), tokens.end(), "server") == tokens.end()) {
-      throw std::runtime_error("Error: Missing required 'server' context.");
+  }
+  if (std::find(tokens.begin(), tokens.end(), "server") == tokens.end()) {
+    throw std::runtime_error("Error: Missing required 'server' context.");
+  }
+
+  // Validate specific context tokens and their following tokens
+  for (size_t i = 0; i < tokens.size(); ++i) {
+    const std::string &token = tokens[i];
+
+    if (token == "http" || token == "server") {
+      // Next token must exist and must be an opening brace
+      if ((i + 1) >= tokens.size()) {
+        throw std::runtime_error("Error: Unexpected end of file after '" +
+                                 token + "' context.");
+      }
+      if (tokens[i + 1] == "}") {
+        throw std::runtime_error("Error: Unexpected closing brace after '" +
+                                 token + "' context.");
+      }
+      if (tokens[i + 1] != "{") {
+        throw std::runtime_error("Error: '" + token +
+                                 "' context must be followed by '{'.");
+      }
     }
-    
+
+    if (token == "location") {
+      // 'location' must be followed by a path token and then an opening brace
+      if ((i + 1) >= tokens.size()) {
+        throw std::runtime_error("Error: 'location' directive missing path.");
+      }
+      if (tokens[i + 1] == "}") {
+        throw std::runtime_error(
+            "Error: Unexpected closing brace after 'location' directive.");
+      }
+      if (tokens[i + 1] == "{") {
+        throw std::runtime_error(
+            "Error: 'location' directive missing path before '{'.");
+      }
+      if ((i + 2) >= tokens.size() || tokens[i + 2] != "{") {
+        throw std::runtime_error("Error: 'location' directive must be followed "
+                                 "by a path and then '{'.");
+      }
+    }
   }
 }
 
@@ -212,6 +252,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::string> tokens = tokenize_config_file(config_content);
     validate_syntax(tokens);
+    validateRequiredContexts(tokens);
     // For demonstration, print the tokens
     for (size_t i = 0; i < tokens.size(); ++i) {
       std::cout << "Token " << i << ": " << tokens[i] << std::endl;
