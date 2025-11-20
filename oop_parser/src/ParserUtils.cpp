@@ -23,8 +23,11 @@ int ft_stoi(const std::string &str)
 	std::stringstream ss(str);
 	long value = 0;
 	ss >> value;
-	if (!ss || value > std::numeric_limits<int>::max())
+
+	// Check for overflow/underflow and conversion errors
+	if (ss.fail() || value > std::numeric_limits<int>::max())
 		throw ConfigError("Value is out of bounds: " + str);
+
 	return (static_cast<int>(value));
 }
 
@@ -99,7 +102,7 @@ std::string statusCodeString(short statusCode)
 void requireTrailingSemicolon(std::string &token, const std::string &context)
 {
 	if (token.empty() || token[token.size() - 1] != ';')
-		throw ConfigError("Token is invalid in " + context);
+		throw ConfigError("Token is invalid in " + context + " (missing semicolon)");
 	token.erase(token.size() - 1);
 }
 

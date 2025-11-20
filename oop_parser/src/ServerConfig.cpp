@@ -60,24 +60,26 @@ void ServerConfig::setServerName(std::string server_name)
 	_server_name = normalizeWithSemicolon(server_name, "server_name");
 }
 
-void ServerConfig::setHost(std::string parametr)
+void ServerConfig::setHost(std::string parameter)
 {
-	parametr = normalizeWithSemicolon(parametr, "host");
-	if (parametr == "localhost")
-		parametr = "127.0.0.1";
-	if (!isValidHost(parametr))
+	parameter = normalizeWithSemicolon(parameter, "host");
+	if (parameter == "localhost")
+		parameter = "127.0.0.1";
+	if (!isValidHost(parameter))
 		throw ConfigError("Wrong syntax: host");
-	_host = inet_addr(parametr.data());
+	_host = inet_addr(parameter.data());
 }
 
 void ServerConfig::setRoot(std::string root)
 {
 	root = normalizeWithSemicolon(root, "root");
+	// Check if it is an absolute path or existing directory
 	if (ConfigFile::getTypePath(root) == 2)
 	{
 		_root = root;
 		return ;
 	}
+	// Try to resolve relative to current working directory
 	char dir[1024];
 	if (!getcwd(dir, sizeof(dir)))
 		throw ConfigError("Failed to resolve working directory");
@@ -87,26 +89,26 @@ void ServerConfig::setRoot(std::string root)
 	_root = full_root;
 }
 
-void ServerConfig::setPort(std::string parametr)
+void ServerConfig::setPort(std::string parameter)
 {
-	parametr = normalizeWithSemicolon(parametr, "port");
-	for (size_t i = 0; i < parametr.length(); i++)
+	parameter = normalizeWithSemicolon(parameter, "port");
+	for (size_t i = 0; i < parameter.length(); i++)
 	{
-		if (!std::isdigit(parametr[i]))
+		if (!std::isdigit(parameter[i]))
 			throw ConfigError("Wrong syntax: port");
 	}
-	unsigned int port = ft_stoi((parametr));
+	unsigned int port = ft_stoi((parameter));
 	if (port < 1 || port > 65636)
 		throw ConfigError("Wrong syntax: port");
 	_port = static_cast<uint16_t>(port);
 }
 
-void ServerConfig::setClientMaxBodySize(std::string parametr)
+void ServerConfig::setClientMaxBodySize(std::string parameter)
 {
-	parametr = normalizeWithSemicolon(parametr, "client_max_body_size");
-	if (!isDigits(parametr))
+	parameter = normalizeWithSemicolon(parameter, "client_max_body_size");
+	if (!isDigits(parameter))
 		throw ConfigError("Wrong syntax: client_max_body_size");
-	unsigned long body_size = ft_stoi(parametr);
+	unsigned long body_size = ft_stoi(parameter);
 	if (body_size == 0)
 		throw ConfigError("Wrong syntax: client_max_body_size");
 	_client_max_body_size = body_size;
@@ -126,27 +128,30 @@ void ServerConfig::setAutoindex(std::string autoindex)
 		_autoindex = true;
 }
 
-void ServerConfig::setErrorPages(std::vector<std::string> parametr)
+void ServerConfig::setErrorPages(std::vector<std::string> parameter)
 {
-	if (parametr.empty())
+	if (parameter.empty())
 		return;
-	if (parametr.size() % 2 != 0)
+	if (parameter.size() % 2 != 0)
 		throw ConfigError("Error page initialization failed");
-	for (size_t i = 0; i + 1 < parametr.size(); i += 2)
+
+	for (size_t i = 0; i + 1 < parameter.size(); i += 2)
 	{
-		for (size_t j = 0; j < parametr[i].size(); j++)
+		for (size_t j = 0; j < parameter[i].size(); j++)
 		{
-			if (!std::isdigit(parametr[i][j]))
+			if (!std::isdigit(parameter[i][j]))
 				throw ConfigError("Error code is invalid");
 		}
-		if (parametr[i].size() != 3)
+		if (parameter[i].size() != 3)
 			throw ConfigError("Error code is invalid");
-		short code_error = ft_stoi(parametr[i]);
+		short code_error = ft_stoi(parameter[i]);
 		if (statusCodeString(code_error) == "Undefined" || code_error < 400)
-			throw ConfigError("Incorrect error code: " + parametr[i]);
-		std::string path = parametr[i + 1];
+			throw ConfigError("Incorrect error code: " + parameter[i]);
+		std::string path = parameter[i + 1];
 		if (!path.empty() && path[path.size() - 1] == ';')
 			path = normalizeWithSemicolon(path, "error_page");
+
+		// Check validity of error page path
 		if (ConfigFile::getTypePath(path) != 2)
 		{
 			if (ConfigFile::getTypePath(_root + path) != 1)
@@ -162,7 +167,7 @@ void ServerConfig::setErrorPages(std::vector<std::string> parametr)
 	}
 }
 
-void ServerConfig::setLocation(std::string path, std::vector<std::string> parametr)
+void ServerConfig::setLocation(std::string path, std::vector<std::string> parameter)
 {
 	Location new_location;
 	bool flag_methods = false;
@@ -171,131 +176,131 @@ void ServerConfig::setLocation(std::string path, std::vector<std::string> parame
 	int valid;
 
 	new_location.setPath(path);
-	for (size_t i = 0; i < parametr.size(); i++)
+	for (size_t i = 0; i < parameter.size(); i++)
 	{
-		if (parametr[i] == "root" && (i + 1) < parametr.size())
+		if (parameter[i] == "root" && (i + 1) < parameter.size())
 		{
 			if (!new_location.getRootLocation().empty())
 				throw ConfigError("Root of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			value = normalizeWithSemicolon(value, "location root");
 			if (ConfigFile::getTypePath(value) == 2)
 				new_location.setRootLocation(value);
 			else
 				new_location.setRootLocation(_root + value);
 		}
-		else if ((parametr[i] == "allow_methods" || parametr[i] == "methods") && (i + 1) < parametr.size())
+		else if ((parameter[i] == "allow_methods" || parameter[i] == "methods") && (i + 1) < parameter.size())
 		{
 			if (flag_methods)
 				throw ConfigError("Allow_methods of location is duplicated");
 			std::vector<std::string> methods;
-			while (++i < parametr.size())
+			while (++i < parameter.size())
 			{
-				if (parametr[i].find(";") != std::string::npos)
+				if (parameter[i].find(";") != std::string::npos)
 				{
-					std::string value = parametr[i];
+					std::string value = parameter[i];
 					value = normalizeWithSemicolon(value, "allow_methods");
 					methods.push_back(value);
 					break ;
 				}
 				else
 				{
-					methods.push_back(parametr[i]);
-					if (i + 1 >= parametr.size())
+					methods.push_back(parameter[i]);
+					if (i + 1 >= parameter.size())
 						throw ConfigError("Token is invalid");
 				}
 			}
 			new_location.setMethods(methods);
 			flag_methods = true;
 		}
-		else if (parametr[i] == "autoindex" && (i + 1) < parametr.size())
+		else if (parameter[i] == "autoindex" && (i + 1) < parameter.size())
 		{
 			if (path == "/cgi-bin")
 				throw ConfigError("Parametr autoindex not allow for CGI");
 			if (flag_autoindex)
 				throw ConfigError("Autoindex of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			new_location.setAutoindex(value);
 			flag_autoindex = true;
 		}
-		else if (parametr[i] == "index" && (i + 1) < parametr.size())
+		else if (parameter[i] == "index" && (i + 1) < parameter.size())
 		{
 			if (!new_location.getIndexLocation().empty())
 				throw ConfigError("Index of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			new_location.setIndexLocation(value);
 		}
-		else if (parametr[i] == "return" && (i + 1) < parametr.size())
+		else if (parameter[i] == "return" && (i + 1) < parameter.size())
 		{
 			if (path == "/cgi-bin")
 				throw ConfigError("Parametr return not allow for CGI");
 			if (!new_location.getReturn().empty())
 				throw ConfigError("Return of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			new_location.setReturn(value);
 		}
-		else if (parametr[i] == "alias" && (i + 1) < parametr.size())
+		else if (parameter[i] == "alias" && (i + 1) < parameter.size())
 		{
 			if (path == "/cgi-bin")
 				throw ConfigError("Parametr alias not allow for CGI");
 			if (!new_location.getAlias().empty())
 				throw ConfigError("Alias of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			new_location.setAlias(value);
 		}
-		else if (parametr[i] == "cgi_ext" && (i + 1) < parametr.size())
+		else if (parameter[i] == "cgi_ext" && (i + 1) < parameter.size())
 		{
 			std::vector<std::string> extension;
-			while (++i < parametr.size())
+			while (++i < parameter.size())
 			{
-				if (parametr[i].find(";") != std::string::npos)
+				if (parameter[i].find(";") != std::string::npos)
 				{
-					std::string value = parametr[i];
+					std::string value = parameter[i];
 					value = normalizeWithSemicolon(value, "cgi_ext");
 					extension.push_back(value);
 					break ;
 				}
 				else
 				{
-					extension.push_back(parametr[i]);
-					if (i + 1 >= parametr.size())
+					extension.push_back(parameter[i]);
+					if (i + 1 >= parameter.size())
 						throw ConfigError("Token is invalid");
 				}
 			}
 			new_location.setCgiExtension(extension);
 		}
-		else if (parametr[i] == "cgi_path" && (i + 1) < parametr.size())
+		else if (parameter[i] == "cgi_path" && (i + 1) < parameter.size())
 		{
 			std::vector<std::string> path_list;
-			while (++i < parametr.size())
+			while (++i < parameter.size())
 			{
-				if (parametr[i].find(";") != std::string::npos)
+				if (parameter[i].find(";") != std::string::npos)
 				{
-					std::string value = parametr[i];
+					std::string value = parameter[i];
 					value = normalizeWithSemicolon(value, "cgi_path");
 					path_list.push_back(value);
 					break ;
 				}
 				else
 				{
-					path_list.push_back(parametr[i]);
-					if (i + 1 >= parametr.size())
+					path_list.push_back(parameter[i]);
+					if (i + 1 >= parameter.size())
 						throw ConfigError("Token is invalid");
 				}
-				if (parametr[i].find("/python") == std::string::npos && parametr[i].find("/bash") == std::string::npos)
+				if (parameter[i].find("/python") == std::string::npos && parameter[i].find("/bash") == std::string::npos)
 					throw ConfigError("cgi_path is invalid");
 			}
 			new_location.setCgiPath(path_list);
 		}
-		else if (parametr[i] == "client_max_body_size" && (i + 1) < parametr.size())
+		else if (parameter[i] == "client_max_body_size" && (i + 1) < parameter.size())
 		{
 			if (flag_max_size)
 				throw ConfigError("Maxbody_size of location is duplicated");
-			std::string value = parametr[++i];
+			std::string value = parameter[++i];
 			new_location.setMaxBodySize(value);
 			flag_max_size = true;
 		}
-		else if (i < parametr.size())
+		else if (i < parameter.size())
 			throw ConfigError("Parametr in a location is invalid");
 	}
 	if (new_location.getPath() != "/cgi-bin" && new_location.getIndexLocation().empty())
@@ -442,9 +447,9 @@ std::vector<Location>::const_iterator ServerConfig::getLocationKey(const std::st
 	throw ConfigError("Error: path to location not found");
 }
 
-void ServerConfig::checkToken(std::string &parametr)
+void ServerConfig::checkToken(std::string &parameter)
 {
-	requireTrailingSemicolon(parametr, "directive");
+	requireTrailingSemicolon(parameter, "directive");
 }
 
 bool ServerConfig::checkLocaitons() const

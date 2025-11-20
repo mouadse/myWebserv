@@ -25,16 +25,16 @@ Location &Location::operator=(const Location &rhs)
 
 Location::~Location() {}
 
-void Location::setPath(const std::string &parametr)
+void Location::setPath(const std::string &parameter)
 {
-	_path = parametr;
+	_path = parameter;
 }
 
-void Location::setRootLocation(const std::string &parametr)
+void Location::setRootLocation(const std::string &parameter)
 {
-	if (ConfigFile::getTypePath(parametr) != 2)
-		throw ConfigError("root of location is invalid: " + parametr);
-	_root = parametr;
+	if (ConfigFile::getTypePath(parameter) != 2)
+		throw ConfigError("root of location is invalid: " + parameter);
+	_root = parameter;
 }
 
 void Location::setMethods(const std::vector<std::string> &methods)
@@ -64,9 +64,9 @@ static std::string dropSemicolonIfAny(std::string value, const std::string &cont
 	return (value);
 }
 
-void Location::setAutoindex(const std::string &parametr)
+void Location::setAutoindex(const std::string &parameter)
 {
-	std::string value = dropSemicolonIfAny(parametr, "autoindex");
+	std::string value = dropSemicolonIfAny(parameter, "autoindex");
 	if (value == "on")
 		_autoindex = true;
 	else if (value == "off")
@@ -75,19 +75,19 @@ void Location::setAutoindex(const std::string &parametr)
 		throw ConfigError("Wrong autoindex value: " + value);
 }
 
-void Location::setIndexLocation(const std::string &parametr)
+void Location::setIndexLocation(const std::string &parameter)
 {
-	_index = dropSemicolonIfAny(parametr, "index");
+	_index = dropSemicolonIfAny(parameter, "index");
 }
 
-void Location::setReturn(const std::string &parametr)
+void Location::setReturn(const std::string &parameter)
 {
-	_return = dropSemicolonIfAny(parametr, "return");
+	_return = dropSemicolonIfAny(parameter, "return");
 }
 
-void Location::setAlias(const std::string &parametr)
+void Location::setAlias(const std::string &parameter)
 {
-	_alias = dropSemicolonIfAny(parametr, "alias");
+	_alias = dropSemicolonIfAny(parameter, "alias");
 }
 
 void Location::setCgiPath(const std::vector<std::string> &path)
@@ -100,9 +100,9 @@ void Location::setCgiExtension(const std::vector<std::string> &extension)
 	_cgi_ext = extension;
 }
 
-void Location::setMaxBodySize(const std::string &parametr)
+void Location::setMaxBodySize(const std::string &parameter)
 {
-	std::string value = dropSemicolonIfAny(parametr, "client_max_body_size");
+	std::string value = dropSemicolonIfAny(parameter, "client_max_body_size");
 	unsigned long body_size = 0;
 	if (!isDigits(value))
 		throw ConfigError("Wrong syntax: client_max_body_size");
@@ -112,9 +112,9 @@ void Location::setMaxBodySize(const std::string &parametr)
 	_client_max_body_size = body_size;
 }
 
-void Location::setMaxBodySize(unsigned long parametr)
+void Location::setMaxBodySize(unsigned long parameter)
 {
-	_client_max_body_size = parametr;
+	_client_max_body_size = parameter;
 }
 
 const std::string &Location::getPath() const { return (_path); }
