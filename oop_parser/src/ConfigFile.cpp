@@ -33,32 +33,40 @@ int ConfigFile::getTypePath(const std::string &path)
 	if (result == 0)
 	{
 		if (buffer.st_mode & S_IFREG)
-			return (1);
+			return (1); // Regular file
 		else if (buffer.st_mode & S_IFDIR)
-			return (2);
+			return (2); // Directory
 		else
-			return (3);
+			return (3); // Other
 	}
-	return (-1);
+	return (-1); // Error or not found
 }
 
 int	ConfigFile::checkFile(const std::string &path, int mode)
 {
+	// access() returns 0 on success, -1 on failure
 	return (access(path.c_str(), mode));
 }
 
 int ConfigFile::isFileExistAndReadable(const std::string &path, const std::string &index)
 {
+	// Check if 'index' itself is a valid file
 	if (getTypePath(index) == 1 && checkFile(index, 4) == 0)
 		return (0);
+
+	// Check if 'path + index' is a valid file
 	if (getTypePath(path + index) == 1 && checkFile(path + index, 4) == 0)
 		return (0);
+
+	// Check if 'path + / + index' is a valid file
 	std::string with_slash = path;
 	if (!with_slash.empty() && with_slash[with_slash.size() - 1] != '/')
 		with_slash += "/";
 	with_slash += index;
+
 	if (getTypePath(with_slash) == 1 && checkFile(with_slash, 4) == 0)
 		return (0);
+
 	return (-1);
 }
 
