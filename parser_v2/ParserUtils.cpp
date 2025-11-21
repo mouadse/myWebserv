@@ -54,3 +54,12 @@ std::string ParserUtils::trimWhitespace(const std::string &value) {
   size_t end = value.find_last_not_of(whitespace);
   return value.substr(start, end - start + 1);
 }
+
+void ParserUtils::enforceTrailingSemicolon(std::string &token,
+                                           const std::string &context) {
+  if (token.empty() || token.back() != ';') {
+    throw std::invalid_argument("Missing trailing semicolon in " + context +
+                                ": " + token);
+  }
+  token.pop_back(); // Remove the semicolon
+}
