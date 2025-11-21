@@ -17,11 +17,11 @@ public:
   ~ParserUtils();
 
   // Utility functions
+  bool isAllDigits(const std::string &value);
   int stoiStrict(const std::string &str);
   unsigned int hexToUint(const std::string &hex);
   std::string statusCodeToString(short statusCode);
   void enforceTrailingSemicolon(std::string &token, const std::string &context);
-  bool isAllDigits(const std::string &value);
   std::string trimWhitespace(const std::string &value);
 };
 
