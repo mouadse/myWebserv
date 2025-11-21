@@ -22,13 +22,13 @@ public:
 
   std::string getFilename() const;
   size_t getSize() const;
-  std::string getFileContent(const std::string &filepath) const;
 
   // Utils functions
   static int getTypePath(const std::string &path);
   static int checkFile(const std::string &filepath, int mode);
   static int doesFileExistAndIsReadable(const std::string &filepath,
                                         const std::string &index);
+  std::string getFileContent(const std::string &filepath) const;
 };
 
 #endif

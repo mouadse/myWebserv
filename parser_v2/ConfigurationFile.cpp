@@ -66,3 +66,15 @@ int ConfigurationFile::doesFileExistAndIsReadable(const std::string &filepath,
 
   return (-1);
 }
+
+std::string
+ConfigurationFile::getFileContent(const std::string &filepath) const {
+  std::ifstream fileStream(filepath);
+  std::stringstream buffer;
+  if (!fileStream.is_open()) {
+    throw std::runtime_error("Could not open file: " +
+                             filepath); // ToDo : To optimized later
+  }
+  buffer << fileStream.rdbuf();
+  return buffer.str();
+}
