@@ -1,16 +1,15 @@
 #ifndef PARSER_UTILS_HPP
 #define PARSER_UTILS_HPP
 
-#include <string>
-#include <stdexcept>
 #include <limits>
+#include <stdexcept>
+#include <string>
 
 static const unsigned long kDefaultMaxBodySize = 30000000UL;
 
-class ConfigError : public std::runtime_error
-{
-	public:
-		explicit ConfigError(const std::string &message);
+class ConfigError : public std::runtime_error {
+public:
+  explicit ConfigError(const std::string &message);
 };
 
 int ft_stoi(const std::string &str);
