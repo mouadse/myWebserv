@@ -1,32 +1,24 @@
 #include "ParserUtils.hpp"
 
-// Default constructor
-ParserUtils::ParserUtils(void)
-{
-    std::cout << "Default constructor called" << std::endl;
-    return ;
-}
+ParserUtils::ParserUtils() {}
 
-// Copy constructor
-ParserUtils::ParserUtils(const ParserUtils &other)
-{
-    std::cout << "Copy constructor called" << std::endl;
-    (void) other;
-    return ;
-}
+ParserUtils::ParserUtils(const ParserUtils &other) {}
 
-// Assignment operator overload
-ParserUtils &ParserUtils::operator=(const ParserUtils &other)
-{
-    std::cout << "Assignment operator called" << std::endl;
-    (void) other;
-    return (*this);
-}
+ParserUtils &ParserUtils::operator=(const ParserUtils &other) { return *this; }
 
-// Destructor
-ParserUtils::~ParserUtils(void)
-{
-    std::cout << "Destructor called" << std::endl;
-    return ;
-}
+ParserUtils::~ParserUtils() {}
 
+int ParserUtils::stoiStrict(const std::string &str) {
+  if (!isAllDigits(str)) {
+    throw std::invalid_argument("Invalid integer string: " + str);
+  }
+  std::stringstream ss(str);
+  long value = 0;
+  ss >> value;
+
+  if (ss.fail() || value > std::numeric_limits<int>::max()) {
+    throw std::invalid_argument("Value is out of bounds: " + str);
+  }
+
+  return (static_cast<int>(value));
+}
