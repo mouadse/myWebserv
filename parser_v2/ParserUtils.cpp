@@ -1,14 +1,6 @@
 #include "ParserUtils.hpp"
 
-ParserUtils::ParserUtils() {}
-
-ParserUtils::ParserUtils(const ParserUtils &other) {}
-
-ParserUtils &ParserUtils::operator=(const ParserUtils &other) { return *this; }
-
-ParserUtils::~ParserUtils() {}
-
-bool ParserUtils::isAllDigits(const std::string &value) {
+bool isAllDigits(const std::string &value) {
   for (size_t i = 0; i < value.length(); ++i) {
     if (!std::isdigit(static_cast<unsigned char>(value[i]))) {
       return false;
@@ -17,7 +9,7 @@ bool ParserUtils::isAllDigits(const std::string &value) {
   return true;
 }
 
-int ParserUtils::stoiStrict(const std::string &str) {
+int stoiStrict(const std::string &str) {
   if (!isAllDigits(str)) {
     throw std::invalid_argument("Invalid integer string: " + str);
   }
@@ -31,7 +23,7 @@ int ParserUtils::stoiStrict(const std::string &str) {
   return (static_cast<int>(value));
 }
 
-unsigned int ParserUtils::hexToUint(const std::string &hex) {
+unsigned int hexToUint(const std::string &hex) {
   unsigned int res = 0;
   std::stringstream ss;
   ss << std::hex << hex;
@@ -42,7 +34,7 @@ unsigned int ParserUtils::hexToUint(const std::string &hex) {
   return res;
 }
 
-std::string ParserUtils::trimWhitespace(const std::string &value) {
+std::string trimWhitespace(const std::string &value) {
   const std::string whitespace = " \t\n\r\f\v";
   if (value.empty()) {
     return value;
@@ -55,8 +47,7 @@ std::string ParserUtils::trimWhitespace(const std::string &value) {
   return value.substr(start, end - start + 1);
 }
 
-void ParserUtils::enforceTrailingSemicolon(std::string &token,
-                                           const std::string &context) {
+void enforceTrailingSemicolon(std::string &token, const std::string &context) {
   if (token.empty() || token.back() != ';') {
     throw std::invalid_argument("Missing trailing semicolon in " + context +
                                 ": " + token);
@@ -64,7 +55,7 @@ void ParserUtils::enforceTrailingSemicolon(std::string &token,
   token.pop_back(); // Remove the semicolon
 }
 
-std::string ParserUtils::statusCodeToString(short statusCode) {
+std::string statusCodeToString(short statusCode) {
   switch (statusCode) {
   case 100:
     return ("Continue");
