@@ -53,4 +53,3 @@ static std::string stripTrailingSemicolonIfPresent(std::string &token,
   }
   return token;
 }
-
