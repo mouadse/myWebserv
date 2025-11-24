@@ -53,3 +53,25 @@ static std::string stripTrailingSemicolonIfPresent(std::string &token,
   }
   return token;
 }
+
+void LocationBlock::setMethods(const std::vector<std::string> &methods) {
+  _methods.assign(5, 0); // Reset methods
+  for (size_t i = 0; i < methods.size(); ++i) {
+    // ToDo to be inspected later
+    std::string method = stripTrailingSemicolonIfPresent(
+        const_cast<std::string &>(methods[i]), "location block methods");
+    if (method == "GET") {
+      _methods[0] = 1;
+    } else if (method == "POST") {
+      _methods[1] = 1;
+    } else if (method == "DELETE") {
+      _methods[2] = 1;
+    } else if (method == "PUT") {
+      _methods[3] = 1;
+    } else if (method == "HEAD") {
+      _methods[4] = 1;
+    } else {
+      throw std::runtime_error("Allow method not supported " + method);
+    }
+  }
+}
