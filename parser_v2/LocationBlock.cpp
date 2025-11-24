@@ -75,3 +75,15 @@ void LocationBlock::setMethods(const std::vector<std::string> &methods) {
     }
   }
 }
+
+void LocationBlock::setAutoindex(const std::string &autoindex) {
+  std::string value = stripTrailingSemicolonIfPresent(
+      const_cast<std::string &>(autoindex), "location block autoindex");
+  if (value == "on") {
+    _autoindex = true;
+  } else if (value == "off") {
+    _autoindex = false;
+  } else {
+    throw std::runtime_error("Autoindex value not supported: " + value);
+  }
+}
