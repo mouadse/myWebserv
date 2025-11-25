@@ -87,3 +87,100 @@ void LocationBlock::setAutoindex(const std::string &autoindex) {
     throw std::runtime_error("Autoindex value not supported: " + value);
   }
 }
+
+void LocationBlock::setIndex(const std::string &index) {
+  std::string value = stripTrailingSemicolonIfPresent(
+      const_cast<std::string &>(index), "location block index");
+  _index = value;
+}
+
+void LocationBlock::setReturn(const std::string &ret) {
+  std::string value = stripTrailingSemicolonIfPresent(
+      const_cast<std::string &>(ret), "location block return");
+  _return = value;
+}
+
+void LocationBlock::setAlias(const std::string &alias) {
+  std::string value = stripTrailingSemicolonIfPresent(
+      const_cast<std::string &>(alias), "location block alias");
+  _alias = value;
+}
+
+void LocationBlock::setCgiPaths(const std::vector<std::string> &paths) {
+  _cgi_paths = paths;
+}
+
+void LocationBlock::setCgiExtensions(
+    const std::vector<std::string> &extensions) {
+  _cgi_extensions = extensions;
+}
+
+void LocationBlock::setMaxBodySize(const std::string &size_str) {
+  std::string value = stripTrailingSemicolonIfPresent(
+      const_cast<std::string &>(size_str), "location block max body size");
+  unsigned long size = 0;
+  if (!isAllDigits(size_str)) {
+    throw std::runtime_error("Max body size must be a positive integer: " +
+                             size_str);
+  }
+  size = static_cast<unsigned long>(stoiStrict(size_str));
+  if (!size) {
+    throw std::runtime_error("Max body size must be greater than zero: " +
+                             size_str);
+  }
+  _max_body_size = size;
+}
+
+void LocationBlock::setMaxBodySize(unsigned long size) {
+  _max_body_size = size;
+}
+
+// Getters for our class members
+
+const std::string &LocationBlock::getRoot() const { return _root; }
+const std::string &LocationBlock::getPath() const { return _path; }
+const std::string &LocationBlock::getIndex() const { return _index; }
+const bool &LocationBlock::getAutoindex() const { return _autoindex; }
+const std::string &LocationBlock::getReturn() const { return _return; }
+const std::string &LocationBlock::getAlias() const { return _alias; }
+const std::vector<short> &LocationBlock::getMethods() const { return _methods; }
+const std::vector<std::string> &LocationBlock::getCgiExtensions() const {
+  return _cgi_extensions;
+}
+const std::vector<std::string> &LocationBlock::getCgiPaths() const {
+  return _cgi_paths;
+}
+const unsigned long &LocationBlock::getMaxBodySize() const {
+  return _max_body_size;
+}
+const std::map<std::string, std::string> &
+LocationBlock::getExtensionToCgiMap() const {
+  return _extension_to_cgi;
+}
+
+std::string LocationBlock::getPrintMethods(void) const {
+  std::string res;
+  if (_methods[4])
+    res.insert(0, "HEAD");
+  if (_methods[3]) {
+    if (!res.empty())
+      res.insert(0, ", ");
+    res.insert(0, "PUT");
+  }
+  if (_methods[2]) {
+    if (!res.empty())
+      res.insert(0, ", ");
+    res.insert(0, "DELETE");
+  }
+  if (_methods[1]) {
+    if (!res.empty())
+      res.insert(0, ", ");
+    res.insert(0, "POST");
+  }
+  if (_methods[0]) {
+    if (!res.empty())
+      res.insert(0, ", ");
+    res.insert(0, "GET");
+  }
+  return (res);
+}

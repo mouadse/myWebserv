@@ -43,7 +43,7 @@ public:
   // Getter methods for our private members
   const std::string &getRoot(void) const;
   const std::string &getPath(void) const;
-  bool getAutoindex(void) const;
+  const bool &getAutoindex(void) const;
   const std::string &getIndex(void) const;
   const std::string &getReturn(void) const;
   const std::string &getAlias(void) const;
@@ -51,7 +51,7 @@ public:
   const std::vector<std::string> &getCgiExtensions(void) const;
   const std::vector<std::string> &getCgiPaths(void) const;
   const std::map<std::string, std::string> &getExtensionToCgiMap(void) const;
-  unsigned long getMaxBodySize(void) const;
+  const unsigned long &getMaxBodySize(void) const;
 
   // For debugging purposes
   /*
