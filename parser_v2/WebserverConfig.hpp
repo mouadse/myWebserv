@@ -44,6 +44,36 @@ public:
   void setClientMaxBodySize(std::string value);
   void setErrorPages(std::vector<std::string> error_pages);
   void setIdex(std::string index);
+
+  void setLocationBlocks(std::string nameLocation,
+                         std::vector<LocationBlock> location_blocks);
+  void setAutoindex(std::string autoindex);
+
+  // Our validators for our attributes
+
+  bool isValidHost(std::string host) const;
+  bool isValidErrorPages();
+  int iaValidLocationBlock(LocationBlock &location_block) const;
+
+  // Getters for our attributes
+  const std::string &getServerName() const;
+  const uint16_t &getPort() const;
+  const in_addr_t &getHost() const;
+  const size_t &getMaxBodySize() const;
+  const std::vector<LocationBlock> &getLocationBlocks() const;
+  const std::string &getRoot() const;
+  const std::map<short, std::string> &getErrorPages() const;
+  const std::string &getIndex() const;
+  const bool &getAutoindex() const;
+  const std::string getPathErrorPage(short key) const;
+  std::vector<LocationBlock>::const_iterator
+  getLocationBlockByName(const std::string &name) const;
+
+  static void checkTokenValidity(std::string &token);
+  bool checkLocations() const;
+
+  void setupWebserver(void);
+  int getFdX(void) const;
 };
 
 #endif
