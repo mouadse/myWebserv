@@ -118,7 +118,7 @@ void WebserverConfig::setClientMaxBodySize(std::string value) {
   _max_body_size = size;
 }
 
-void WebserverConfig::setIdex(std::string index) {
+void WebserverConfig::setIndex(std::string index) {
   _index = normalizeDirective(index, "index");
 }
 
@@ -206,12 +206,14 @@ void WebserverConfig::setLocationBlocks(
       if (has_autoindex)
         throw std::runtime_error("Autoindex of location is duplicated");
       std::string value = parameters[++i];
+      value = normalizeDirective(value, "location autoindex");
       new_location.setAutoindex(value);
       has_autoindex = true;
     } else if (parameters[i] == "index" && (i + 1) < parameters.size()) {
       if (!new_location.getIndex().empty())
         throw std::runtime_error("Index of location is duplicated");
       std::string value = parameters[++i];
+      value = normalizeDirective(value, "location index");
       new_location.setIndex(value);
     } else if (parameters[i] == "return" && (i + 1) < parameters.size()) {
       if (path == "/cgi-bin")
@@ -219,6 +221,7 @@ void WebserverConfig::setLocationBlocks(
       if (!new_location.getReturn().empty())
         throw std::runtime_error("Return of location is duplicated");
       std::string value = parameters[++i];
+      value = normalizeDirective(value, "location return");
       new_location.setReturn(value);
     } else if (parameters[i] == "alias" && (i + 1) < parameters.size()) {
       if (path == "/cgi-bin")
@@ -226,6 +229,7 @@ void WebserverConfig::setLocationBlocks(
       if (!new_location.getAlias().empty())
         throw std::runtime_error("Alias of location is duplicated");
       std::string value = parameters[++i];
+      value = normalizeDirective(value, "location alias");
       new_location.setAlias(value);
     } else if (parameters[i] == "cgi_ext" && (i + 1) < parameters.size()) {
       std::vector<std::string> extensions;
@@ -268,6 +272,7 @@ void WebserverConfig::setLocationBlocks(
       if (has_max_size)
         throw std::runtime_error("Maxbody_size of location is duplicated");
       std::string value = parameters[++i];
+      value = normalizeDirective(value, "location client_max_body_size");
       new_location.setMaxBodySize(value);
       has_max_size = true;
     } else if (i < parameters.size()) {
@@ -280,7 +285,7 @@ void WebserverConfig::setLocationBlocks(
   if (!has_max_size)
     new_location.setMaxBodySize(_max_body_size);
 
-  int validation = iaValidLocationBlock(new_location);
+  int validation = isValidLocationBlock(new_location);
   if (validation == 1)
     throw std::runtime_error("Failed CGI validation");
   else if (validation == 2)
@@ -311,7 +316,7 @@ bool WebserverConfig::isValidErrorPages() {
   return true;
 }
 
-int WebserverConfig::iaValidLocationBlock(LocationBlock &location_block) const {
+int WebserverConfig::isValidLocationBlock(LocationBlock &location_block) const {
   if (location_block.getPath() == "/cgi-bin") {
     if (location_block.getCgiPaths().empty() ||
         location_block.getCgiExtensions().empty() ||

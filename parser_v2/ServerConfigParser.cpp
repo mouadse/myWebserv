@@ -171,7 +171,7 @@ void ServerConfigParser::createServer(std::string &server_config,
 void ServerConfigParser::_parseServerContent(const std::string &config,
                                              WebserverConfig &server) {
   std::vector<std::string> tokens =
-      splitParameters(config + ' ', std::string(" \n\t"));
+      splitParameters(config + ' ', std::string(" \n\t\r"));
   if (tokens.size() < 3)
     throw std::runtime_error("Failed server validation");
 
@@ -216,7 +216,7 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
     } else if (tokens[i] == "index" && (i + 1) < tokens.size()) {
       if (!server.getIndex().empty())
         throw std::runtime_error("Index is duplicated");
-      server.setIdex(tokens[++i]);
+      server.setIndex(tokens[++i]);
     } else if (tokens[i] == "autoindex" && (i + 1) < tokens.size()) {
       if (flag_autoindex)
         throw std::runtime_error("Autoindex of server is duplicated");
@@ -232,7 +232,7 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
   if (server.getHost() == 0)
     server.setHost("localhost;");
   if (server.getIndex().empty())
-    server.setIdex("index.html;");
+    server.setIndex("index.html;");
 
   if (ConfigurationFile::doesFileExistAndIsReadable(server.getRoot(),
                                                     server.getIndex()))

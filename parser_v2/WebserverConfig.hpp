@@ -44,7 +44,7 @@ public:
   void setPort(std::string value);
   void setClientMaxBodySize(std::string value);
   void setErrorPages(std::vector<std::string> error_pages);
-  void setIdex(std::string index);
+  void setIndex(std::string index);
 
   void setLocationBlocks(std::string path,
                          const std::vector<std::string> &parameters);
@@ -54,7 +54,7 @@ public:
 
   bool isValidHost(std::string host) const;
   bool isValidErrorPages();
-  int iaValidLocationBlock(LocationBlock &location_block) const;
+  int isValidLocationBlock(LocationBlock &location_block) const;
 
   // Getters for our attributes
   const std::string &getServerName() const;

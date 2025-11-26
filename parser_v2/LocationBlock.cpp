@@ -46,18 +46,10 @@ void LocationBlock::setRoot(const std::string &root) {
 }
 void LocationBlock::setPath(const std::string &path) { _path = path; }
 
-static std::string stripTrailingSemicolonIfPresent(
-    std::string token, const std::string &context) {
-  if (!token.empty() && token[token.size() - 1] == ';')
-    enforceTrailingSemicolon(token, context);
-  return (token);
-}
-
 void LocationBlock::setMethods(const std::vector<std::string> &methods) {
   _methods.assign(5, 0); // Reset methods
   for (size_t i = 0; i < methods.size(); ++i) {
-    std::string method = stripTrailingSemicolonIfPresent(
-        methods[i], "location block methods");
+    std::string method = methods[i];
     if (method == "GET") {
       _methods[0] = 1;
     } else if (method == "POST") {
@@ -75,33 +67,25 @@ void LocationBlock::setMethods(const std::vector<std::string> &methods) {
 }
 
 void LocationBlock::setAutoindex(const std::string &autoindex) {
-  std::string value = stripTrailingSemicolonIfPresent(
-      autoindex, "location block autoindex");
-  if (value == "on") {
+  if (autoindex == "on") {
     _autoindex = true;
-  } else if (value == "off") {
+  } else if (autoindex == "off") {
     _autoindex = false;
   } else {
-    throw std::runtime_error("Autoindex value not supported: " + value);
+    throw std::runtime_error("Autoindex value not supported: " + autoindex);
   }
 }
 
 void LocationBlock::setIndex(const std::string &index) {
-  std::string value = stripTrailingSemicolonIfPresent(
-      index, "location block index");
-  _index = value;
+  _index = index;
 }
 
 void LocationBlock::setReturn(const std::string &ret) {
-  std::string value = stripTrailingSemicolonIfPresent(
-      ret, "location block return");
-  _return = value;
+  _return = ret;
 }
 
 void LocationBlock::setAlias(const std::string &alias) {
-  std::string value = stripTrailingSemicolonIfPresent(
-      alias, "location block alias");
-  _alias = value;
+  _alias = alias;
 }
 
 void LocationBlock::setCgiPaths(const std::vector<std::string> &paths) {
@@ -114,14 +98,12 @@ void LocationBlock::setCgiExtensions(
 }
 
 void LocationBlock::setMaxBodySize(const std::string &size_str) {
-  std::string value = stripTrailingSemicolonIfPresent(
-      size_str, "location block max body size");
   unsigned long size = 0;
-  if (!isAllDigits(value)) {
+  if (!isAllDigits(size_str)) {
     throw std::runtime_error("Max body size must be a positive integer: " +
                              size_str);
   }
-  size = static_cast<unsigned long>(stoiStrict(value));
+  size = static_cast<unsigned long>(stoiStrict(size_str));
   if (!size) {
     throw std::runtime_error("Max body size must be greater than zero: " +
                              size_str);
