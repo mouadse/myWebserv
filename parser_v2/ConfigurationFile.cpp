@@ -1,5 +1,7 @@
 #include "ConfigurationFile.hpp"
 
+#include <stdexcept>
+
 ConfigurationFile::ConfigurationFile() : _filename(""), _size(0) {}
 
 ConfigurationFile::ConfigurationFile(const std::string &filename)
@@ -69,7 +71,7 @@ int ConfigurationFile::doesFileExistAndIsReadable(const std::string &filepath,
 
 std::string
 ConfigurationFile::getFileContent(const std::string &filepath) const {
-  std::ifstream fileStream(filepath);
+  std::ifstream fileStream(filepath.c_str());
   std::stringstream buffer;
   if (!fileStream.is_open()) {
     throw std::runtime_error("Could not open file: " +

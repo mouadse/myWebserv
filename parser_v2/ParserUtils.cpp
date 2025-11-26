@@ -48,11 +48,10 @@ std::string trimWhitespace(const std::string &value) {
 }
 
 void enforceTrailingSemicolon(std::string &token, const std::string &context) {
-  if (token.empty() || token.back() != ';') {
-    throw std::invalid_argument("Missing trailing semicolon in " + context +
-                                ": " + token);
-  }
-  token.pop_back(); // Remove the semicolon
+  if (token.empty() || token[token.size() - 1] != ';')
+    throw std::invalid_argument("Token is invalid in " + context +
+                                " (missing semicolon)");
+  token.erase(token.size() - 1); // Remove the semicolon
 }
 
 std::string statusCodeToString(short statusCode) {
