@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <string>
 #include <sys/socket.h>
 #include <vector>
 
@@ -20,7 +21,7 @@ private:
   std::string _server_name;
   std::string _root;
   std::string _index;
-  unsigned long _max_body_size;
+  size_t _max_body_size;
   bool _autoindex;
   std::map<short, std::string> _error_pages;
   std::vector<LocationBlock> _location_blocks;
@@ -45,8 +46,8 @@ public:
   void setErrorPages(std::vector<std::string> error_pages);
   void setIdex(std::string index);
 
-  void setLocationBlocks(std::string nameLocation,
-                         std::vector<LocationBlock> location_blocks);
+  void setLocationBlocks(std::string path,
+                         const std::vector<std::string> &parameters);
   void setAutoindex(std::string autoindex);
 
   // Our validators for our attributes
