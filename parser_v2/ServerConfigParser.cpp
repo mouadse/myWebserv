@@ -147,8 +147,7 @@ size_t ServerConfigParser::locateServerStart(std::string &content, size_t pos) {
 }
 
 size_t ServerConfigParser::locateServerEnd(std::string &content, size_t pos) {
-  if (pos == std::string::npos || pos >= content.size() ||
-      content[pos] != '{')
+  if (pos == std::string::npos || pos >= content.size() || content[pos] != '{')
     return std::string::npos;
   size_t scope = 0;
   for (size_t i = pos + 1; i < content.size(); ++i) {
@@ -208,8 +207,7 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
           throw std::runtime_error("Wrong character out of server scope{}");
       }
       error_page_blocks.push_back(error_codes);
-    } else if (tokens[i] == "client_max_body_size" &&
-               (i + 1) < tokens.size()) {
+    } else if (tokens[i] == "client_max_body_size" && (i + 1) < tokens.size()) {
       if (flag_max_body_size)
         throw std::runtime_error("Client_max_body_size is duplicated");
       server.setClientMaxBodySize(tokens[++i]);
@@ -251,8 +249,9 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
     throw std::runtime_error("Locaition is duplicated");
   if (!server.getPort())
     throw std::runtime_error("Port not found");
-  if (!server.isValidErrorPages())
-    throw std::runtime_error("Incorrect path for error page or number of error");
+  if (!server.isValidErrorPages())ServerConfigParser.cpp
+    throw std::runtime_error(
+        "Incorrect path for error page or number of error");
 }
 
 void ServerConfigParser::_collectLocationBlock(

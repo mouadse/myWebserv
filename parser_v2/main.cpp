@@ -1,8 +1,8 @@
+#include <exception>
 #include <iostream>
 #include <string>
-#include <exception>
 
-#include "ServerConfigParser.hpp" // Assuming ServerConfigParser.hpp is the correct header
+#include "ServerConfigParser.hpp"
 
 int main(int argc, char **argv) {
   std::string config_path = "example.conf";
@@ -10,10 +10,12 @@ int main(int argc, char **argv) {
     config_path = argv[1];
 
   try {
-    ServerConfigParser parser; // Changed from ConfigParser to ServerConfigParser
-    // Assuming createCluster and print methods exist in ServerConfigParser
+    ServerConfigParser parser;
     parser.createCluster(config_path);
-    parser.print(std::cout);
+    std::vector<WebserverConfig> servers = parser.getServers();
+    std::cout << "Successfully parsed " << servers.size()
+              << " server(s) from configuration file." << std::endl;
+    // parser.print(std::cout);
   } catch (const std::exception &e) {
     std::cerr << e.what() << std::endl;
     return (1);

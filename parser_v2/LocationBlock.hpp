@@ -53,11 +53,6 @@ public:
   const std::map<std::string, std::string> &getExtensionToCgiMap(void) const;
   const unsigned long &getMaxBodySize(void) const;
 
-  // For debugging purposes
-  /*
-   * Returns a string representation of the allowed
-   * methods Eg: "GET POST DELETE"
-   */
   std::string getPrintMethods(void) const;
 };
 
