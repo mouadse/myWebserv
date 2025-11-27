@@ -249,7 +249,7 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
     throw std::runtime_error("Locaition is duplicated");
   if (!server.getPort())
     throw std::runtime_error("Port not found");
-  if (!server.isValidErrorPages())ServerConfigParser.cpp
+  if (!server.isValidErrorPages())
     throw std::runtime_error(
         "Incorrect path for error page or number of error");
 }
