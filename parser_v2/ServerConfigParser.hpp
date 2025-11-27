@@ -13,8 +13,12 @@ private:
   size_t _num_of_servers;
 
   void _parseServerContent(const std::string &config, WebserverConfig &server);
-  void _parseLocationBlock(const std::vector<std::string> &lines, size_t &index,
-                           WebserverConfig &server);
+  void _collectLocationBlock(const std::vector<std::string> &tokens,
+                             size_t &index, std::string &path,
+                             std::vector<std::string> &location_tokens);
+  void _parseLocationTokens(const std::string &path,
+                            const std::vector<std::string> &location_tokens,
+                            WebserverConfig &server);
 
 public:
   ServerConfigParser(void);

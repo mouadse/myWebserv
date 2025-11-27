@@ -22,6 +22,7 @@ make test TEST_FILTER=cgi
 | `valid_multiserver.conf` | Two valid servers with CGI, error page overrides, and differing limits to ensure cluster validation plus inheritance path. |
 | `valid_defaults.conf` | Exercises default host/index/body-size inheritance plus per-location overrides. |
 | `valid_cgi_extended.conf` | CGI-heavy server that verifies path/extension pairing, redirects, and small-body limits. |
+| `valid_alias_and_return.conf` | Alias/return pairing, wildcard CGI mapping, and alternate `methods` directive usage. |
 
 ### Invalid fixtures
 
@@ -45,3 +46,10 @@ make test TEST_FILTER=cgi
 | `invalid_cgi_mismatch.conf` | Mismatched `cgi_ext`/`cgi_path` lists trigger CGI validation failure. |
 | `invalid_scope_trailing_text.conf` | Trailing text after a server block should break scope detection. |
 | `invalid_error_page_missing_file.conf` | Points an `error_page` to a file that does not exist. |
+| `invalid_return_missing_file.conf` | `return` target points to a missing file, exercising redirect file validation. |
+| `invalid_alias_missing_file.conf` | `alias` targets a missing file to confirm alias existence checks. |
+| `invalid_error_page_odd_count.conf` | `error_page` declared with an odd number of tokens should be rejected. |
+| `invalid_cgi_bad_path.conf` | `cgi_path` uses a non-python/bash interpreter and must be refused. |
+| `invalid_cgi_bad_extension.conf` | Unsupported CGI extension (`.php`) should fail validation. |
+| `invalid_location_missing_index.conf` | Location inherits a missing index file from a real directory, tripping index validation. |
+| `invalid_duplicate_server_defaults.conf` | Two servers collide on defaults (host/server_name) without explicit duplication. |

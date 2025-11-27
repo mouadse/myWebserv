@@ -177,6 +177,8 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
 
   bool flag_autoindex = false;
   bool flag_max_body_size = false;
+  std::vector<std::pair<std::string, std::vector<std::string> > > locations;
+  std::vector<std::vector<std::string> > error_page_blocks;
 
   for (size_t i = 0; i < tokens.size(); ++i) {
     if (tokens[i] == "listen" && (i + 1) < tokens.size()) {
@@ -184,7 +186,10 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
         throw std::runtime_error("Port is duplicated");
       server.setPort(tokens[++i]);
     } else if (tokens[i] == "location" && (i + 1) < tokens.size()) {
-      _parseLocationBlock(tokens, i, server);
+      std::string path;
+      std::vector<std::string> location_tokens;
+      _collectLocationBlock(tokens, i, path, location_tokens);
+      locations.push_back(std::make_pair(path, location_tokens));
     } else if (tokens[i] == "host" && (i + 1) < tokens.size()) {
       if (server.getHost())
         throw std::runtime_error("Host is duplicated");
@@ -202,7 +207,7 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
         if (i + 1 >= tokens.size())
           throw std::runtime_error("Wrong character out of server scope{}");
       }
-      server.setErrorPages(error_codes);
+      error_page_blocks.push_back(error_codes);
     } else if (tokens[i] == "client_max_body_size" &&
                (i + 1) < tokens.size()) {
       if (flag_max_body_size)
@@ -234,6 +239,11 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
   if (server.getIndex().empty())
     server.setIndex("index.html;");
 
+  for (size_t i = 0; i < error_page_blocks.size(); ++i)
+    server.setErrorPages(error_page_blocks[i]);
+  for (size_t i = 0; i < locations.size(); ++i)
+    _parseLocationTokens(locations[i].first, locations[i].second, server);
+
   if (ConfigurationFile::doesFileExistAndIsReadable(server.getRoot(),
                                                     server.getIndex()))
     throw std::runtime_error("Index from config file not found or unreadable");
@@ -245,27 +255,29 @@ void ServerConfigParser::_parseServerContent(const std::string &config,
     throw std::runtime_error("Incorrect path for error page or number of error");
 }
 
-void ServerConfigParser::_parseLocationBlock(
-    const std::vector<std::string> &lines, size_t &index,
+void ServerConfigParser::_collectLocationBlock(
+    const std::vector<std::string> &tokens, size_t &index, std::string &path,
+    std::vector<std::string> &location_tokens) {
+  ++index;
+  if (index >= tokens.size() || tokens[index] == "{" || tokens[index] == "}")
+    throw std::runtime_error("Wrong character in server scope{}");
+  path = tokens[index];
+
+  if ((index + 1) >= tokens.size() || tokens[++index] != "{")
+    throw std::runtime_error("Wrong character in server scope{}");
+  ++index;
+
+  while (index < tokens.size() && tokens[index] != "}")
+    location_tokens.push_back(tokens[index++]);
+
+  if (index >= tokens.size() || tokens[index] != "}")
+    throw std::runtime_error("Wrong character in server scope{}");
+}
+
+void ServerConfigParser::_parseLocationTokens(
+    const std::string &path, const std::vector<std::string> &location_tokens,
     WebserverConfig &server) {
-  std::vector<std::string> location_tokens;
-
-  ++index;
-  if (index >= lines.size() || lines[index] == "{" || lines[index] == "}")
-    throw std::runtime_error("Wrong character in server scope{}");
-  std::string path = lines[index];
-
-  if ((index + 1) >= lines.size() || lines[++index] != "{")
-    throw std::runtime_error("Wrong character in server scope{}");
-  ++index;
-
-  while (index < lines.size() && lines[index] != "}")
-    location_tokens.push_back(lines[index++]);
-
   server.setLocationBlocks(path, location_tokens);
-
-  if (index >= lines.size() || lines[index] != "}")
-    throw std::runtime_error("Wrong character in server scope{}");
 }
 
 void ServerConfigParser::checkServers(void) {

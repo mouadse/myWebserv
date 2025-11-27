@@ -11,6 +11,19 @@ std::string normalizeDirective(std::string value, const std::string &context) {
   value = trimWhitespace(value);
   return value;
 }
+
+std::string joinPaths(const std::string &base, const std::string &relative) {
+  if (relative.empty())
+    return base;
+  std::string rel = relative;
+  if (!rel.empty() && rel[0] == '/')
+    rel.erase(0, 1);
+  if (base.empty())
+    return rel;
+  if (base[base.size() - 1] == '/')
+    return base + rel;
+  return base + "/" + rel;
+}
 } // namespace
 
 WebserverConfig::WebserverConfig(void)
@@ -144,16 +157,16 @@ void WebserverConfig::setErrorPages(std::vector<std::string> error_pages) {
     std::string path = error_pages[i + 1];
     if (!path.empty() && path[path.size() - 1] == ';')
       path = normalizeDirective(path, "error_page");
-    if (ConfigurationFile::getTypePath(path) != 2) {
-      std::string full_path = _root + path;
-      if (ConfigurationFile::getTypePath(full_path) != 1)
-        throw std::runtime_error("Incorrect path for error page file: " +
-                                 full_path);
-      if (ConfigurationFile::checkFile(full_path, 0) == -1 ||
-          ConfigurationFile::checkFile(full_path, 4) == -1)
-        throw std::runtime_error("Error page file :" + full_path +
-                                 " is not accessible");
-    }
+    std::string candidate = path;
+    if (ConfigurationFile::getTypePath(candidate) != 1)
+      candidate = joinPaths(_root, path);
+    if (ConfigurationFile::getTypePath(candidate) != 1)
+      throw std::runtime_error("Incorrect path for error page file: " +
+                               candidate);
+    if (ConfigurationFile::checkFile(candidate, 0) == -1 ||
+        ConfigurationFile::checkFile(candidate, 4) == -1)
+      throw std::runtime_error("Error page file :" + candidate +
+                               " is not accessible");
     std::map<short, std::string>::iterator it = _error_pages.find(status_code);
     if (it != _error_pages.end())
       it->second = path;
@@ -179,7 +192,7 @@ void WebserverConfig::setLocationBlocks(
       if (ConfigurationFile::getTypePath(value) == 2)
         new_location.setRoot(value);
       else
-        new_location.setRoot(_root + value);
+        new_location.setRoot(joinPaths(_root, value));
     } else if ((parameters[i] == "allow_methods" ||
                 parameters[i] == "methods") &&
                (i + 1) < parameters.size()) {
@@ -294,6 +307,8 @@ void WebserverConfig::setLocationBlocks(
     throw std::runtime_error("Failed redirection file in location validation");
   else if (validation == 4)
     throw std::runtime_error("Failed alias file in location validation");
+  else if (validation == 5)
+    throw std::runtime_error("Failed index file in location validation");
 
   _location_blocks.push_back(new_location);
 }
@@ -309,8 +324,14 @@ bool WebserverConfig::isValidErrorPages() {
   for (it = _error_pages.begin(); it != _error_pages.end(); ++it) {
     if (it->first < 100 || it->first > 599)
       return false;
-    if (ConfigurationFile::checkFile(getRoot() + it->second, 0) < 0 ||
-        ConfigurationFile::checkFile(getRoot() + it->second, 4) < 0)
+    if (it->second.empty())
+      continue;
+    std::string candidate = it->second;
+    if (ConfigurationFile::getTypePath(candidate) != 1)
+      candidate = joinPaths(getRoot(), it->second);
+    if (ConfigurationFile::getTypePath(candidate) != 1 ||
+        ConfigurationFile::checkFile(candidate, 0) < 0 ||
+        ConfigurationFile::checkFile(candidate, 4) < 0)
       return false;
   }
   return true;
@@ -323,16 +344,17 @@ int WebserverConfig::isValidLocationBlock(LocationBlock &location_block) const {
         location_block.getIndex().empty())
       return 1;
     if (ConfigurationFile::checkFile(location_block.getIndex(), 4) < 0) {
-      std::string candidate = location_block.getRoot() +
-                              location_block.getPath() + "/" +
-                              location_block.getIndex();
+      std::string candidate = joinPaths(
+          joinPaths(location_block.getRoot(), location_block.getPath()),
+          location_block.getIndex());
       if (ConfigurationFile::getTypePath(candidate) != 1) {
         char cwd[1024];
         if (!getcwd(cwd, sizeof(cwd)))
           return 1;
         location_block.setRoot(std::string(cwd));
-        candidate = std::string(cwd) + location_block.getPath() + "/" +
-                    location_block.getIndex();
+        candidate = joinPaths(
+            joinPaths(location_block.getRoot(), location_block.getPath()),
+            location_block.getIndex());
       }
       if (candidate.empty() || ConfigurationFile::getTypePath(candidate) != 1 ||
           ConfigurationFile::checkFile(candidate, 4) < 0)
@@ -374,10 +396,15 @@ int WebserverConfig::isValidLocationBlock(LocationBlock &location_block) const {
       return 2;
     if (location_block.getRoot().empty())
       location_block.setRoot(_root);
-    if (ConfigurationFile::doesFileExistAndIsReadable(
-            location_block.getRoot() + location_block.getPath() + "/",
-            location_block.getIndex()))
-      return 5;
+    std::string location_root =
+        joinPaths(location_block.getRoot(), location_block.getPath());
+    if (ConfigurationFile::getTypePath(location_root) == 2) {
+      std::string candidate_index =
+          joinPaths(location_root, location_block.getIndex());
+      if (ConfigurationFile::getTypePath(candidate_index) != 1 ||
+          ConfigurationFile::checkFile(candidate_index, 4) < 0)
+        return 5;
+    }
     if (!location_block.getReturn().empty()) {
       if (ConfigurationFile::doesFileExistAndIsReadable(
               location_block.getRoot(), location_block.getReturn()))

@@ -408,6 +408,103 @@ static bool verifyValidCgiExtended(const ServerConfigParser &parser,
   return (true);
 }
 
+static bool verifyValidAliasAndReturn(const ServerConfigParser &parser,
+                                      std::string &message) {
+  std::vector<WebserverConfig> servers = parser.getServers();
+  if (servers.size() != 1) {
+    message = "Expected single server in alias/return config";
+    return (false);
+  }
+  const WebserverConfig &server = servers[0];
+  if (server.getPort() != 8101 ||
+      server.getHost() != inet_addr("10.0.0.42")) {
+    message = "alias_return listen/host mismatch";
+    return (false);
+  }
+  if (server.getServerName() != "alias_return") {
+    message = "alias_return server_name mismatch";
+    return (false);
+  }
+  if (!server.getAutoindex()) {
+    message = "alias_return should keep autoindex on";
+    return (false);
+  }
+  if (server.getErrorPages().find(404)->second != "/errors/404.html" ||
+      server.getErrorPages().find(500)->second != "/errors/500.html") {
+    message = "alias_return error pages not registered";
+    return (false);
+  }
+
+  const LocationBlock *root = findLocation(server, "/");
+  if (!root) {
+    message = "alias_return missing / location";
+    return (false);
+  }
+  if (!checkAllowedMethods(*root, true, false, false, false, true, message))
+    return (false);
+
+  const LocationBlock *mirror = findLocation(server, "/mirror");
+  if (!mirror) {
+    message = "alias_return missing /mirror location";
+    return (false);
+  }
+  if (!checkAllowedMethods(*mirror, true, true, false, false, false, message))
+    return (false);
+  if (!mirror->getAutoindex()) {
+    message = "/mirror autoindex override missing";
+    return (false);
+  }
+  if (mirror->getAlias() != "errors/500.html") {
+    message = "/mirror alias mismatch";
+    return (false);
+  }
+  if (mirror->getReturn() != "/errors/404.html") {
+    message = "/mirror return mismatch";
+    return (false);
+  }
+  if (mirror->getMaxBodySize() != 128UL) {
+    message = "/mirror max body size override missing";
+    return (false);
+  }
+  if (mirror->getIndex() != server.getIndex()) {
+    message = "/mirror index should inherit server index";
+    return (false);
+  }
+
+  const LocationBlock *cgi = findLocation(server, "/cgi-bin");
+  if (!cgi) {
+    message = "alias_return missing /cgi-bin";
+    return (false);
+  }
+  if (cgi->getRoot() != "./www") {
+    message = "/cgi-bin root override failed";
+    return (false);
+  }
+  if (cgi->getCgiExtensions().size() != 2 ||
+      cgi->getCgiPaths().size() != 2) {
+    message = "cgi wildcard location did not capture both path/ext pairs";
+    return (false);
+  }
+  if (cgi->getExtensionToCgiMap().size() != 2 ||
+      !cgi->getExtensionToCgiMap().count(".py") ||
+      !cgi->getExtensionToCgiMap().count(".sh")) {
+    message = "cgi wildcard extension mapping incomplete";
+    return (false);
+  }
+  if (cgi->getExtensionToCgiMap().find(".py")->second.find("python") ==
+          std::string::npos ||
+      cgi->getExtensionToCgiMap().find(".sh")->second.find("bash") ==
+          std::string::npos) {
+    message = "cgi wildcard map did not pair extensions to interpreters";
+    return (false);
+  }
+  if (cgi->getIndex() != "handler.py") {
+    message = "/cgi-bin index missing";
+    return (false);
+  }
+  return (true);
+}
+
 static bool containsSubstring(const std::string &value,
                               const std::string &needle) {
   if (needle.empty())
@@ -484,6 +581,9 @@ int main(int argc, char **argv) {
        &verifyValidDefaults},
       {"valid_cgi_extended", "tests/configs/valid_cgi_extended.conf", true, "",
        &verifyValidCgiExtended},
+      {"valid_alias_and_return",
+       "tests/configs/valid_alias_and_return.conf", true, "",
+       &verifyValidAliasAndReturn},
       {"invalid_missing_semicolon",
        "tests/configs/invalid_missing_semicolon.conf", false,
        "missing semicolon", NULL},
@@ -534,6 +634,26 @@ int main(int argc, char **argv) {
       {"invalid_error_page_missing_file",
        "tests/configs/invalid_error_page_missing_file.conf", false,
        "Incorrect path for error page file", NULL},
+      {"invalid_return_missing_file",
+       "tests/configs/invalid_return_missing_file.conf", false,
+       "Failed redirection file", NULL},
+      {"invalid_alias_missing_file",
+       "tests/configs/invalid_alias_missing_file.conf", false,
+       "Failed alias file", NULL},
+      {"invalid_error_page_odd_count",
+       "tests/configs/invalid_error_page_odd_count.conf", false,
+       "Error page initialization failed", NULL},
+      {"invalid_cgi_bad_path", "tests/configs/invalid_cgi_bad_path.conf",
+       false, "cgi_path is invalid", NULL},
+      {"invalid_cgi_bad_extension",
+       "tests/configs/invalid_cgi_bad_extension.conf", false,
+       "Failed CGI validation", NULL},
+      {"invalid_location_missing_index",
+       "tests/configs/invalid_location_missing_index.conf", false,
+       "Failed index file in location validation", NULL},
+      {"invalid_duplicate_server_defaults",
+       "tests/configs/invalid_duplicate_server_defaults.conf", false,
+       "Failed server validation", NULL},
   };
 
   const size_t total_tests = sizeof(test_cases) / sizeof(TestCase);
