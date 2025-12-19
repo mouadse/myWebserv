@@ -199,25 +199,44 @@ void Server::readClient(int fd) {
     return;
   }
   Client *c = it->second;
-  std::vector<char> buf(16096);
+  char buf[16384]; // 16KB stack buffer for efficiency
 
+  // Read loop - drain until EAGAIN (edge-triggered)
   while (true) {
-    ssize_t n = read(fd, &buf[0], buf.size());
+    ssize_t n = read(fd, buf, sizeof(buf));
 
     if (n > 0) {
-      buf.resize(n);
-      c->request.addData(buf);
-      buf.resize(16096);
+      c->request.addData(buf, n); // Zero-copy overload
       Logger::debug("Added " + Helpers::toString(n) +
                     " bytes to request buffer");
 
-      if (c->request.hasError())
-        break; // Stop reading, will close after loop
-
-      if (c->request.isComplete()) {
+      // Pipelining loop: process all complete requests
+      while (c->request.isComplete() && !c->request.hasError()) {
         Logger::debug("Request complete on FD: " + Helpers::toString(fd));
-        break;
+
+        // Process this request
+        RequestHandler handler(config);
+        handler.process(c->request, c->response);
+
+        // Append response to write buffer (don't overwrite previous responses)
+        std::string res = c->response.toString();
+        c->writeBuffer.insert(c->writeBuffer.end(), res.begin(), res.end());
+        c->wantWrite = true;
+
+        // Check Connection: close header
+        std::string conn = c->request.getHeader("connection");
+        if (conn == "close") {
+          c->closeAfterWrite = true;
+        }
+
+        // Reset for next request (preserves leftover data in buffer)
+        c->request.reset();
+        c->response = HttpResponse(); // Reset response for next request
       }
+
+      if (c->request.hasError())
+        break;
+
     } else if (n == 0) {
       Logger::info("Client FD: " + Helpers::toString(fd) +
                    " disconnected (read 0 bytes)");
@@ -226,11 +245,8 @@ void Server::readClient(int fd) {
     } else {
       if (errno == EINTR)
         continue;
-      if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        if (c->request.isComplete())
-          break;
-        return; // Wait for next EPOLLIN
-      }
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+        break; // No more data available
       Logger::error("read() failed on FD: " + Helpers::toString(fd) + ": " +
                     std::string(strerror(errno)));
       closeClient(fd);
@@ -245,22 +261,12 @@ void Server::readClient(int fd) {
     return;
   }
 
-  // after receiving the function we call the function handler to process it :
-  RequestHandler handler(config);
-  handler.process(c->request, c->response);
-
-  // after proccessing, the handler create the response. ( we might have a
-  // problem in the case of the cgi)
-  std::string res = c->response.toString();
-  c->writeBuffer.assign(res.begin(), res.end());
-  c->wantWrite = true;
-
-  // modify the state of the fd so that we can write on it
-  EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-  Logger::debug("Modified FD: " + Helpers::toString(fd) +
-                " to EPOLLOUT for writing");
-
-  c->request.reset();
+  // If we have data to write, switch to EPOLLOUT
+  if (c->wantWrite && !c->writeBuffer.empty()) {
+    EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
+    Logger::debug("Modified FD: " + Helpers::toString(fd) +
+                  " to EPOLLOUT for writing");
+  }
 }
 
 void Server::writeClient(int fd) {
