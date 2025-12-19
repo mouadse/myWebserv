@@ -204,11 +204,6 @@ int EpollManager::wait(epoll_event *events, int maxEvents) {
                 " ready events");
 
   if (ready < 0) {
-    if (errno == EINTR) {
-      Logger::debug("epoll_wait() interrupted by signal (EINTR), continuing");
-      return 0;
-    }
-    Logger::error("epoll_wait() failed: " + std::string(strerror(errno)));
     return ready;
   }
 
