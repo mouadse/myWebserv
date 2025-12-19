@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webserv Configuration to Multiplexing Guide</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f1a32;
+      --muted: #9fb5d5;
+      --text: #e4ecf7;
+      --accent: #7ae0ff;
+      --accent-2: #9df18f;
+      --outline: #1f2b45;
+      --code: #0a1426;
+      --badge: #13203a;
+      --card-bg: rgba(255, 255, 255, 0.03);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Manrope", "Segoe UI", sans-serif;
+      background: radial-gradient(120% 120% at 20% 20%, #112447, #0b1220 40%),
+                  linear-gradient(135deg, #091021, #0f1628);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Typography & Utilities */
+    h1, h2, h3 { margin: 0; }
+    
+    h1 {
+      font-size: 2.6rem;
+      letter-spacing: -1px;
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin: 1.5rem 0 1rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    p { margin: 0 0 1rem; }
+    
+    .note { 
+      color: var(--muted); 
+      font-size: 0.95rem; 
+      line-height: 1.5;
+    }
+
+    /* Layout */
+    header {
+      padding: 4rem 1.5rem 3rem;
+      text-align: center;
+      border-bottom: 1px solid var(--outline);
+      background: rgba(11, 18, 32, 0.95);
+      backdrop-filter: blur(10px);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform;
+    }
+
+    header.hidden {
+      transform: translateY(-100%);
+    }
+
+    header p {
+      color: var(--muted);
+      margin: 1rem auto 0;
+      max-width: 700px;
+      font-size: 1.1rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      margin-top: 12rem; /* Add margin to account for fixed header */
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--outline);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Components */
+    .pill {
+      display: inline-block;
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      background: var(--badge);
+      border: 1px solid var(--outline);
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .card {
+      border: 1px solid var(--outline);
+      border-radius: 12px;
+      padding: 1.5rem;
+      background: var(--card-bg);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      min-width: 0; 
+      word-wrap: break-word;
+    }
+
+    .card:hover { 
+      transform: translateY(-3px); 
+      border-color: var(--muted);
+    }
+
+    /* Code Styling */
+    code {
+      background: var(--code);
+      color: var(--accent-2);
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9em;
+      word-break: break-word; 
+    }
+
+    pre {
+      background: var(--code);
+      border: 1px solid var(--outline);
+      border-radius: 12px;
+      padding: 1.5rem;
+      overflow-x: auto;
+      color: #d8e3f3;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9rem;
+      margin: 1.5rem 0;
+      max-width: 100%;
+    }
+
+    /* Visual Schema */
+    .schema {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 2rem;
+      align-items: stretch;
+    }
+
+    .node {
+      border: 1px solid var(--outline);
+      background: #101a30;
+      border-radius: 12px;
+      padding: 1.2rem;
+      flex: 1 1 200px;
+      min-width: 180px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node .highlight {
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    .arrow {
+      align-self: center;
+      font-size: 1.5rem;
+      color: var(--muted);
+      display: none;
+    }
+
+    /* Interactive Method Lists */
+    .method-list {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0 0;
+      width: 100%;
+    }
+
+    .method-item {
+      border-bottom: 1px solid var(--outline);
+    }
+
+    .method-item:last-child { border-bottom: none; }
+
+    details {
+      width: 100%;
+    }
+
+    details > summary {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0;
+      gap: 0.5rem;
+      cursor: pointer;
+      list-style: none;
+      transition: all 0.2s ease;
+    }
+
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details > summary::before {
+      content: "\203A";
+      font-size: 1.3rem;
+      color: var(--muted);
+      transition: transform 0.2s ease, color 0.2s ease;
+      margin-right: 0.5rem;
+    }
+
+    details[open] > summary::before {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+
+    details > summary:hover {
+      opacity: 0.85;
+      padding-left: 5px;
+    }
+
+    details[open] > summary {
+      color: var(--accent);
+      padding-bottom: 0.5rem;
+    }
+
+    .method-name {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.95rem;
+      color: var(--text);
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    .return {
+      background: var(--badge);
+      color: var(--accent);
+      border: 1px solid var(--outline);
+      border-radius: 6px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.8rem;
+      font-family: "JetBrains Mono", monospace;
+      word-break: break-all;
+      text-align: right;
+    }
+
+    .desc {
+      padding: 0 0.5rem 1rem 2rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin: 0;
+      animation: slideDown 0.2s ease-out;
+    }
+    
+    .desc strong {
+        color: var(--text);
+        font-weight: 600;
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .steps li {
+      counter-increment: step;
+      margin-bottom: 1.5rem;
+      padding-left: 3rem;
+      position: relative;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      background: rgba(122, 224, 255, 0.1);
+      color: var(--accent);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    @media (min-width: 900px) {
+      .arrow { display: block; }
+    }
+
+    @media (max-width: 640px) {
+      h1 { font-size: 2rem; }
+      .section { padding: 1.5rem; }
+      .grid { grid-template-columns: 1fr; }
+      details > summary { flex-direction: column; align-items: flex-start; }
+      .return { text-align: left; margin-top: 0.2rem; }
+      .desc { padding-left: 0.5rem; }
+      .container {
+        margin-top: 10rem; /* Smaller margin on mobile */
+      }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <h1>Configuration → Multiplexing</h1>
+    <p class="header-subtitle">Plain-language field manual for the Webserv config layer. Click any method name to toggle a short explanation. Hand this to anyone wiring our parser output into the HTTP layer or the multiplexed event loop.</p>
+  </header>
+
+  <div class="container">
+    <section class="section">
+      <div class="pill">Mental Model</div>
+      <h2>From config file to epoll-able sockets</h2>
+      <p class="note">Configuration parsing runs once at boot. It reads a <code>.conf</code>, shouts if a path is wrong, and hands you ready-to-bind server descriptions. After that, the IO loop only touches C++ objects, never raw text.</p>
+      <p class="note">Keep it simple: parse → build sockets → hand FDs to epoll/kqueue. No magical background work, so you can trust what each getter returns.</p>
+      
+      <div class="schema">
+        <div class="node">
+          <div class="highlight">ConfigurationFile</div>
+          <div class="note">reads file, checks size, basic FS sanity</div>
+        </div>
+        <div class="arrow">⇢</div>
+        <div class="node">
+          <div class="highlight">ServerConfigParser</div>
+          <div class="note">tokenizes, validates, builds server structs</div>
+        </div>
+        <div class="arrow">⇢</div>
+        <div class="node">
+          <div class="highlight">std::vector&lt;WebserverConfig&gt;</div>
+          <div class="note">one entry per virtual host</div>
+        </div>
+        <div class="arrow">⇢</div>
+        <div class="node">
+          <div class="highlight">Multiplexing</div>
+          <div class="note">register <code>getFdX()</code> into epoll/kqueue</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="pill">How to use it</div>
+      <h2>Step-by-step workflow</h2>
+      <p class="note">Do this once during startup. The goal: end up with non-blocking listening sockets plus route data that your HTTP worker can consult per request.</p>
+      <ol class="steps">
+        <li>
+          <strong>Parse once and keep the vector.</strong> Instantiate <code>ServerConfigParser</code>, call <code>createCluster(path)</code>, then store the returned <code>std::vector&lt;WebserverConfig&gt;</code> for the entire runtime.
+        </li>
+        <li>
+          <strong>Build sockets.</strong> For every <code>WebserverConfig</code>, call <code>setupWebserver()</code>. It handles <code>socket()</code>, <code>SO_REUSEADDR</code>, fills <code>sockaddr_in</code>, and binds using <code>getHost()</code> + <code>getPort()</code>.
+        </li>
+        <li>
+          <strong>Let the caller own listen + blocking flags.</strong> Call <code>listen(server.getFdX(), backlog)</code>, set <code>O_NONBLOCK</code> if needed, and plug the descriptor into your multiplexer (epoll/kqueue/select/poll).
+        </li>
+        <li>
+          <strong>Answer requests with the stored data.</strong> When a connection arrives, pick the matching <code>WebserverConfig</code> (host + port) and use <code>getLocationBlockByName()</code>, <code>getIndex()</code>, <code>getMaxBodySize()</code>, etc., to know which file to open or which CGI binary to launch.
+        </li>
+      </ol>
+      <pre><code>// Parse the configuration file
+ServerConfigParser parser;
+parser.createCluster("config/default.conf");
+std::vector&lt;WebserverConfig&gt; servers = parser.getServers();
+
+// Prepare each listening socket for multiplexing
+for (WebserverConfig &server : servers) {
+  server.setupWebserver();                  // socket + bind using getHost()/getPort()
+  listen(server.getFdX(), 128);             // backlog is your call
+  fcntl(server.getFdX(), F_SETFL, O_NONBLOCK);
+  epoll.add(server.getFdX(), EPOLLIN);      // or kqueue/select wrapper
+}</code></pre>
+    </section>
+
+    <section class="section">
+      <div class="pill">API Reference</div>
+      <h2>Getter reference (toggle for details)</h2>
+      <p class="note">Click any method below to expand a short, plain-English explanation. We spell out what the value means, when to call it, and why the multiplexing + HTTP team should care.</p>
+      <p class="note">If you forget what a directive does, just toggle it—this is meant to be documentation, not trivia.</p>
+      <div class="grid">
+        
+        <!-- ConfigurationFile -->
+        <div class="card">
+          <h3>ConfigurationFile</h3>
+          <p class="note">Tiny helper for file metadata and content.</p>
+          <ul class="method-list">
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getFilename()</span>
+                  <span class="return">std::string</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Returns the full path of the file currently being parsed. <strong>Use it:</strong> whenever you log parser errors or show which config produced a faulty socket. Helpful when teammates juggle different conf files.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getSize()</span>
+                  <span class="return">size_t</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Provides the file size in bytes. <strong>Use it:</strong> to guard against empty configs or to pre-allocate buffers before reading.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getTypePath(path)</span>
+                  <span class="return">int</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Tells you if <code>path</code> is a file (1), directory (2), or invalid (-1). <strong>Use it:</strong> while validating <code>root</code>, <code>alias</code>, and CGI paths before the server boots.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">checkFile(path, mode)</span>
+                  <span class="return">int</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Wrapper around <code>access()</code> to verify read/write/execute permissions. <strong>Use it:</strong> to fail fast if an error page or CGI script is unreadable.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">doesFileExist(root, name)</span>
+                  <span class="return">int</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Checks whether <code>root + name</code> resolves to a valid entry. <strong>Use it:</strong> when toggling through fallback indexes during validation.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getFileContent(path)</span>
+                  <span class="return">std::string</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Reads the file and returns it as a plain string. <strong>Use it:</strong> to feed the parser or to dump configs in integration tests.</p>
+              </details>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ServerConfigParser -->
+        <div class="card">
+          <h3>ServerConfigParser</h3>
+          <p class="note">Consumes the raw file and builds server objects.</p>
+          <ul class="method-list">
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getServers()</span>
+                  <span class="return">vector&lt;WebserverConfig&gt;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Main payload: returns every parsed virtual server. <strong>Use it:</strong> once, store the vector, and iterate to set up listeners and expose routing data to the HTTP workers.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">print(std::ostream&amp;)</span>
+                  <span class="return">int</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Dumps the full configuration tree to an output stream. <strong>Use it:</strong> when diffing behaviors or verifying that directives were parsed as expected.</p>
+              </details>
+            </li>
+          </ul>
+        </div>
+
+        <!-- WebserverConfig -->
+        <div class="card">
+          <h3>WebserverConfig</h3>
+          <p class="note">One virtual host: holds socket details and locations.</p>
+          <ul class="method-list">
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getServerName()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Returns the configured <code>server_name</code>. <strong>Use it:</strong> to match HTTP <code>Host</code> headers when many names share the same IP:port pair.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getPort()</span>
+                  <span class="return">const uint16_t&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Provides the listening port. <strong>Use it:</strong> to fill <code>sockaddr_in.sin_port</code> before bind/listen so your socket ends up on the right TCP port.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getHost()</span>
+                  <span class="return">const in_addr_t&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Stores the host IP (already in network-byte-order). <strong>Use it:</strong> while building <code>sockaddr_in</code> to listen on <code>0.0.0.0</code>, <code>127.0.0.1</code>, etc.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getMaxBodySize()</span>
+                  <span class="return">const size_t&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Global request-body limit for this server. <strong>Use it:</strong> as the default cap when HTTP workers read POST/PUT payloads.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getLocationBlocks()</span>
+                  <span class="return">const vector&lt;LB&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Gives direct access to every raw location block. <strong>Use it:</strong> for bulk inspection or tooling; most runtime lookups should go through <code>getLocationBlockByName()</code>.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getRoot()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> The default document root. <strong>Use it:</strong> whenever no location block overrides the filesystem path.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getErrorPages()</span>
+                  <span class="return">const map&lt;short, string&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Maps HTTP status codes to static files. <strong>Use it:</strong> when building error responses; fall back to a generic template if the map has no entry.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getIndex()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Default file name when a directory is requested (usually <code>index.html</code>). <strong>Use it:</strong> after resolving the root path; append this name before touching the filesystem so directories return a file instead of 403.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getAutoindex()</span>
+                  <span class="return">const bool&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Indicates whether to generate directory listings automatically. <strong>Use it:</strong> when <code>getIndex()</code> fails—if true, emit a listing; otherwise respond with 403.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getPathErrorPage(code)</span>
+                  <span class="return">std::string</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Shortcut to grab the error page path for a specific status. <strong>Use it:</strong> inside your response builder to avoid manually touching the map.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getLocationBlockByName(uri)</span>
+                  <span class="return">iterator</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Finds the best matching <code>LocationBlock</code> for a URI. <strong>Use it:</strong> right after parsing the HTTP request to know which limits, CGI map, or alias apply.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getFdX()</span>
+                  <span class="return">int</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Returns the bound socket file descriptor. <strong>Use it:</strong> to register listeners in epoll/kqueue/select and when you call <code>accept()</code>.</p>
+              </details>
+            </li>
+          </ul>
+        </div>
+
+        <!-- LocationBlock -->
+        <div class="card">
+          <h3>LocationBlock</h3>
+          <p class="note">Routing leaf: methods, CGI mapping, limits.</p>
+          <ul class="method-list">
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getRoot()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Path override for this location. <strong>Use it:</strong> when serving files so URLs like <code>/images</code> can map to <code>/mnt/data/pics</code>.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getPath()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> The URI prefix this block matches. <strong>Use it:</strong> to debug why a request hit a specific block.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getIndex()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Per-location default file. <strong>Use it:</strong> before directory listings—this overrides the server-level index when the URI lives inside the location.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getAutoindex()</span>
+                  <span class="return">const bool&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Location-specific directory listing flag. <strong>Use it:</strong> to decide if you may generate HTML listings for this path.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getReturn()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Stores a redirection target. <strong>Use it:</strong> if present, respond with a 3xx status pointing at this string instead of serving a file.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getAlias()</span>
+                  <span class="return">const std::string&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Remaps the matching URI to another filesystem path. <strong>Use it:</strong> before building the final file path, replacing the leading URI portion.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getMethods()</span>
+                  <span class="return">const vector&lt;short&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Lists allowed HTTP methods (stored as enums). <strong>Use it:</strong> to reject unsupported verbs with 405.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getCgiExtensions()</span>
+                  <span class="return">const vector&lt;string&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> File extensions that should trigger CGI execution. <strong>Use it:</strong> when routing <code>.php</code>, <code>.py</code>, etc., to the CGI runner.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getCgiPaths()</span>
+                  <span class="return">const vector&lt;string&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Holds the interpreter paths (one per extension). <strong>Use it:</strong> together with <code>getCgiExtensions()</code> when launching CGI scripts.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getExtensionToCgiMap()</span>
+                  <span class="return">const map&lt;string, string&gt;&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Direct lookup table for extension → interpreter. <strong>Use it:</strong> at runtime to skip manual matching.</p>
+              </details>
+            </li>
+            <li class="method-item">
+              <details>
+                <summary>
+                  <span class="method-name">getMaxBodySize()</span>
+                  <span class="return">const u_long&amp;</span>
+                </summary>
+                <p class="desc"><strong>Purpose:</strong> Per-location upload limit. <strong>Use it:</strong> to enforce tighter quotas on sensitive endpoints such as <code>/upload</code>.</p>
+              </details>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="pill">In practice</div>
+      <h2>Operational cues</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Defaults & Guards</h3>
+          <p class="note">
+            Missing directives fall back to sane defaults: <code>host</code> → 127.0.0.1, <code>index</code> → <code>index.html</code>, and <code>client_max_body_size</code> → <code>kDefaultMaxBodySize</code>.
+            Validation ensures roots, aliases, error pages, and CGI scripts point to readable paths before the event loop ever starts.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Routing Usage</h3>
+          <p class="note">
+            Pick the matching <code>WebserverConfig</code> by host + port, then call <code>getLocationBlockByName()</code>. From there you can read <code>getRoot()</code>, <code>getAlias()</code>, <code>getIndex()</code>, and method lists to decide how to respond.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Multiplexed Startup</h3>
+          <p class="note">
+            The only contract the event layer needs is a bound listening fd. <code>setupWebserver()</code> builds and binds it for you; grab it with <code>getFdX()</code>.
+            You keep control over backlog, non-blocking flags, and which readiness bits to monitor.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="pill">Next Step</div>
+      <h2>Hand the parsed config to the multiplexed loop</h2>
+      <p class="note">Below is a tiny reference snippet that shows how the parsing results travel into a homemade epoll wrapper and how HTTP routing later reuses the stored <code>WebserverConfig</code> and <code>LocationBlock</code> objects.</p>
+      <pre><code>// 1. Parse configuration
+ServerConfigParser parser;
+parser.createCluster("config/default.conf");
+std::vector&lt;WebserverConfig&gt; servers = parser.getServers();
+
+struct ListenerSlot {
+  int fd;
+  uint16_t port;
+  in_addr_t host;
+  const WebserverConfig* config;
+};
+
+std::vector&lt;ListenerSlot&gt; listeners;
+
+for (WebserverConfig &server : servers) {
+  server.setupWebserver();
+  listen(server.getFdX(), 64);
+  fcntl(server.getFdX(), F_SETFL, O_NONBLOCK);
+
+  listeners.push_back(ListenerSlot{
+    server.getFdX(),
+    server.getPort(),
+    server.getHost(),
+    &server
+  });
+
+  loop.add(server.getFdX(), EPOLLIN, &server); // loop = epoll/kqueue wrapper
+}
+
+// 2. Later, inside the event loop
+void onReadable(int listenerFd) {
+  const WebserverConfig &cfg = *loop.findPayload(listenerFd);
+  const LocationBlock &loc = *cfg.getLocationBlockByName(request.path);
+
+  std::string root = loc.getRoot().empty() ? cfg.getRoot() : loc.getRoot();
+  std::string file = root + request.path;
+  if (isDirectory(file)) {
+    const std::string &index = loc.getIndex().empty() ? cfg.getIndex() : loc.getIndex();
+    file += index;
+  }
+
+  enforceBodyLimit(request, loc.getMaxBodySize(), cfg.getMaxBodySize());
+  sendFile(clientFd, file);
+}
+</code></pre>
+      <p class="note">Swap <code>loop.add</code>, <code>loop.findPayload</code>, and <code>sendFile</code> with your actual abstractions—the core idea is to keep a pointer to the original config object so multiplexing and HTTP logic stay synchronized.</p>
+    </section>
+  </div>
+
+  <script>
+    // Get the header element
+    const header = document.getElementById('mainHeader');
+    let lastScrollTop = 0;
+    
+    // Function to handle scroll event
+    function handleScroll() {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Check scroll direction
+      if (scrollTop > lastScrollTop && scrollTop > 100) {
+        // Scrolling down and past 100px - hide header
+        header.classList.add('hidden');
+      } else {
+        // Scrolling up - show header
+        header.classList.remove('hidden');
+      }
+      
+      lastScrollTop = scrollTop;
+    }
+    
+    // Add scroll event listener with throttling
+    let isScrolling;
+    window.addEventListener('scroll', function() {
+      window.clearTimeout(isScrolling);
+      isScrolling = setTimeout(handleScroll, 50);
+    }, false);
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', handleScroll);
+  </script>
+</body>
+</html>

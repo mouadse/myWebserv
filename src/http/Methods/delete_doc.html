@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DELETE Method Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+        }
+        code {
+            background: #e9e9e9;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        pre {
+            background: #e9e9e9;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP DELETE Method Documentation</h1>
+
+        <section>
+            <h2>Purpose</h2>
+            <p>The <code>DELETE</code> method requests that the origin server delete the resource identified by the Request-URI.</p>
+        </section>
+
+        <section>
+            <h2>Usage</h2>
+            <p>The client sends a <code>DELETE</code> request to the server, specifying the target resource's URL.</p>
+            <pre><code>DELETE /path/to/resource.txt HTTP/1.1
+Host: example.com
+User-Agent: curl/7.64.1
+Accept: */*</code></pre>
+        </section>
+
+        <section>
+            <h2>Request Headers</h2>
+            <p>Common request headers for a <code>DELETE</code> request include:</p>
+            <ul>
+                <li><code>Host</code>: The domain name of the server (required).</li>
+                <li><code>Authorization</code>: (Optional) Credentials for authenticating the client to the server.</li>
+            </ul>
+            <p>A <code>DELETE</code> request typically does not have a request body, although it is not forbidden by the HTTP specification. Servers usually ignore any request body sent with a <code>DELETE</code> request.</p>
+        </section>
+
+        <section>
+            <h2>Response Status Codes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status Code</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>200 OK</code></td>
+                        <td>The request has succeeded. The response body might include a representation of the status. (Less common for DELETE than 204)</td>
+                    </tr>
+                    <tr>
+                        <td><code>202 Accepted</code></td>
+                        <td>The request has been accepted for processing, but the processing has not been completed.</td>
+                    </tr>
+                    <tr>
+                        <td><code>204 No Content</code></td>
+                        <td>The request has succeeded and there is no additional content to send in the response payload body. This is a common successful response for <code>DELETE</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>403 Forbidden</code></td>
+                        <td>The client does not have access rights to the content, or the server refuses to delete a directory.</td>
+                    </tr>
+                    <tr>
+                        <td><code>404 Not Found</code></td>
+                        <td>The server can not find the requested resource.</td>
+                    </tr>
+                    <tr>
+                        <td><code>405 Method Not Allowed</code></td>
+                        <td>The method is not allowed for the requested resource. This can happen if the server configuration disallows <code>DELETE</code> for the path.</td>
+                    </tr>
+                    <tr>
+                        <td><code>500 Internal Server Error</code></td>
+                        <td>The server encountered an unexpected condition that prevented it from fulfilling the request. This might occur due to file system errors during deletion.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Example (using <code>curl</code>)</h2>
+            <p>Assuming a web server running on <code>localhost:8080</code> and a file named <code>example.txt</code> in its root directory:</p>
+            <pre><code># To delete 'example.txt'
+curl -v -X DELETE http://localhost:8080/example.txt</code></pre>
+            <p>Expected successful response (Status 204 No Content):</p>
+            <pre><code>&lt; HTTP/1.1 204 No Content
+&lt; Date: [Current Date and Time]
+&lt; Server: [Your Webserver Name]
+&lt; Connection: close
+&lt; </code></pre>
+        </section>
+
+        <hr>
+
+        <section>
+            <h1>DELETE method tutorial</h1>
+
+            <p>This repo already parses <code>DELETE</code> in <code>src/http/HTTPRequest.cpp</code>, but for it to work end-to-end you must:</p>
+
+            <ul>
+                <li>Dispatch the method from <code>RequestHandler</code></li>
+                <li>Enforce <code>allow_methods</code> for the matched <code>LocationBlock</code></li>
+                <li>Call the actual deleter (<code>src/http/Methods/Delete.cpp</code>)</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Where to call DELETE</h2>
+
+            <p>The correct insertion point is the HTTP method dispatcher:</p>
+
+            <ul>
+                <li><code>src/http/RequestHandler.cpp</code> &rarr; <code>RequestHandler::handleDELETE(...)</code></li>
+            </ul>
+
+            <p>That function should:</p>
+
+            <ol>
+                <li><code>matchLocation(request.getTarget())</code></li>
+                <li>Verify <code>allow_methods</code> includes <code>DELETE</code></li>
+                <li>Call <code>Delete::handle(request, response, location)</code></li>
+            </ol>
+
+            <p>Also, because <code>Client</code> stores a reusable <code>HttpResponse</code>, you should reset <code>response</code> at the start of:</p>
+
+            <ul>
+                <li><code>src/http/RequestHandler.cpp</code> &rarr; <code>RequestHandler::process(...)</code></li>
+            </ul>
+
+            <p>This prevents previous requests’ headers/bodies from leaking into the current response (important for <code>204 No Content</code>).</p>
+        </section>
+
+        <section>
+            <h2>What <code>Delete::handle</code> is expected to do</h2>
+
+            <p><code>src/http/Methods/Delete.cpp</code> should:</p>
+
+            <ul>
+                <li>Map the request target to a filesystem path under the location/server root</li>
+                <li>Refuse traversal outside root (return <code>403</code>)</li>
+                <li>Refuse deleting directories (return <code>403</code>)</li>
+                <li>Return:
+                    <ul>
+                        <li><code>204 No Content</code> on success (with empty body)</li>
+                        <li><code>404 Not Found</code> if the target does not exist</li>
+                        <li><code>403 Forbidden</code> on permission errors</li>
+                        <li><code>500 Internal Server Error</code> on unexpected failures</li>
+                    </ul>
+                </li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Minimal config to test DELETE</h2>
+
+            <p>Add a location that allows DELETE (example for port <code>8080</code>):</p>
+
+            <pre><code>location /delete {
+    root ./www;
+    allow_methods DELETE;
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>Manual test cases</h2>
+
+            <p>Build + run:</p>
+
+            <pre><code>make
+./webserv config/example.conf</code></pre>
+
+            <p>Create a file and delete it (expect <code>204</code>):</p>
+
+            <pre><code>mkdir -p www/delete
+echo hi > www/delete/a.txt
+curl -i -X DELETE http://127.0.0.1:8080/delete/a.txt</code></pre>
+
+            <p>Verify it is removed:</p>
+
+            <pre><code>ls -l www/delete/a.txt</code></pre>
+
+            <p>Not found (expect <code>404</code>):</p>
+
+            <pre><code>curl -i -X DELETE http://127.0.0.1:8080/delete/missing.txt</code></pre>
+
+            <p>Directory delete blocked (expect <code>403</code>):</p>
+
+            <pre><code>mkdir -p www/delete/dir
+curl -i -X DELETE http://127.0.0.1:8080/delete/dir</code></pre>
+
+            <p>Traversal blocked (expect <code>403</code>):</p>
+
+            <pre><code>curl -i -X DELETE 'http://127.0.0.1:8080/delete/../config/example.conf'</code></pre>
+
+            <p>Raw HTTP (no curl), to validate parsing/response formatting:</p>
+
+            <pre><code>printf 'DELETE /delete/a.txt HTTP/1.1\r\nHost: localhost\r\n\r\n' | nc 127.0.0.1 8080</code></pre>
+        </section>
+
+        <section>
+            <h2>Troubleshooting</h2>
+
+            <ul>
+                <li>Getting <code>405 Method Not Allowed</code>: your matched <code>location</code> does not include <code>DELETE</code> in <code>allow_methods</code>.</li>
+                <li>Getting <code>403 Forbidden</code>: you’re deleting a directory, leaving the configured root, or the process lacks permissions on the parent directory.</li>
+            </ul>
+        </section>
+    </div>
+</body>
+</html>
