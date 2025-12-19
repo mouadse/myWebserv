@@ -13,30 +13,28 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-
-
+#include <arpa/inet.h>
 #include <iostream>
-#include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <unistd.h>
 
-#include "./utils/Logger.hpp"
-#include "./utils/Helpers.hpp"
 #include "../http/HTTPRequest.hpp"
 #include "../http/HTTPResponse.hpp"
+#include "./utils/Helpers.hpp"
+#include "./utils/Logger.hpp"
 
-class Client
-{
+class Client {
 public:
-    int fd;               // the client's socket
-    HTTPRequest request;   // to handle the incoming request
-    HttpResponse response;
-    std::vector<char> writeBuffer; // data TO client   (server response)
-
-    bool wantWrite;           // whether we should switch to EPOLLOUT
-    Client(int fd);
-
+  int fd;              // the client's socket
+  HTTPRequest request; // to handle the incoming request
+  HttpResponse response;
+  std::vector<char> writeBuffer; // data TO client   (server response)
+  size_t writeOffset;   // current position in writeBuffer (avoids O(n) erase)
+  bool wantWrite;       // whether we should switch to EPOLLOUT
+  bool closeAfterWrite; // close connection after flushing buffer (Connection:
+                        // close)
+  Client(int fd);
 };
 
 #endif

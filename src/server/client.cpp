@@ -12,40 +12,39 @@
 
 #include "client.hpp"
 
-Client::Client(int fd)
-{
-    Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
-    
-    // 1. Validate FD
-    if (fd < 0)
-    {
-        Logger::error("Invalid client file descriptor: " + Helpers::toString(fd));
-        throw std::runtime_error("Invalid client file descriptor");
-    }
+Client::Client(int fd) {
+  Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
 
-    this->fd = fd;
-    Logger::debug("Client FD set to: " + Helpers::toString(this->fd));
+  // 1. Validate FD
+  if (fd < 0) {
+    Logger::error("Invalid client file descriptor: " + Helpers::toString(fd));
+    throw std::runtime_error("Invalid client file descriptor");
+  }
 
-    // 2. Initialize state safely
-    this->wantWrite = false;
-    Logger::debug("Client wantWrite initialized to false");
-    
-    // this->writeBuffer.clear();
+  this->fd = fd;
+  Logger::debug("Client FD set to: " + Helpers::toString(this->fd));
 
-    // 3. Pre-reserve buffer sizes (security: predictable memory use)
-    // this->writeBuffer.  // enough for your HTTP response
-    
-    Logger::info("Client object created for FD: " + Helpers::toString(fd));
+  // 2. Initialize state safely
+  this->wantWrite = false;
+  this->writeOffset = 0;
+  this->closeAfterWrite = false;
+  Logger::debug("Client state initialized");
+
+  // this->writeBuffer.clear();
+
+  // 3. Pre-reserve buffer sizes (security: predictable memory use)
+  // this->writeBuffer.  // enough for your HTTP response
+
+  Logger::info("Client object created for FD: " + Helpers::toString(fd));
 }
 
-
-//client for the test
+// client for the test
 
 // int main()
 // {
 
-//     int sock = socket(AF_INET, SOCK_STREAM,0); // 0 means choose the protocol automaticaly 
-//     sockaddr_in addr = {};
+//     int sock = socket(AF_INET, SOCK_STREAM,0); // 0 means choose the protocol
+//     automaticaly sockaddr_in addr = {};
 
 //     addr.sin_family = AF_INET;
 //     addr.sin_port = (8080);

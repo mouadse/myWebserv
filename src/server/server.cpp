@@ -273,14 +273,14 @@ void Server::writeClient(int fd) {
     return;
   }
   Client *c = it->second;
-  size_t offset = 0;
   size_t total = c->writeBuffer.size();
 
   // Drain write buffer until EAGAIN (edge-triggered requires full drain)
-  while (offset < total) {
-    ssize_t n = write(fd, c->writeBuffer.data() + offset, total - offset);
+  while (c->writeOffset < total) {
+    ssize_t n = write(fd, c->writeBuffer.data() + c->writeOffset,
+                      total - c->writeOffset);
     if (n > 0) {
-      offset += n;
+      c->writeOffset += n;
       Logger::debug("write() sent " + Helpers::toString(n) +
                     " bytes on FD: " + Helpers::toString(fd));
     } else if (n == 0) {
@@ -299,19 +299,25 @@ void Server::writeClient(int fd) {
     }
   }
 
-  // Remove sent bytes from buffer
-  if (offset > 0)
-    c->writeBuffer.erase(c->writeBuffer.begin(),
-                         c->writeBuffer.begin() + offset);
-
-  if (c->writeBuffer.empty()) {
+  if (c->writeOffset >= total) {
+    // Buffer fully sent - reset for next response
+    c->writeBuffer.clear();
+    c->writeOffset = 0;
     c->wantWrite = false;
+
+    if (c->closeAfterWrite) {
+      Logger::info("Connection: close - closing FD: " + Helpers::toString(fd));
+      closeClient(fd);
+      return;
+    }
+
     EpollManager::getInstance().mod(fd, EPOLLIN | EPOLLRDHUP | EPOLLET);
     Logger::info("Response fully sent on FD: " + Helpers::toString(fd));
   } else {
     // Still have data, keep EPOLLOUT
     EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-    Logger::debug("Partial write, " + Helpers::toString(c->writeBuffer.size()) +
+    Logger::debug("Partial write, " +
+                  Helpers::toString(total - c->writeOffset) +
                   " bytes remaining");
   }
 }
