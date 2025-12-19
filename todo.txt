@@ -1,5 +1,0 @@
-Next steps or things to implement in the project.
-1. Read the file and store it
-2. Tokenize the content
-3. Refactor all the err messages into header macros
-4. Practice trees DSA
