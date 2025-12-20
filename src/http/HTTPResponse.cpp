@@ -12,10 +12,13 @@
 
 #include "HTTPResponse.hpp"
 
-HttpResponse::HttpResponse() : statusCode(200), statusMessage("OK") {}
+HttpResponse::HttpResponse()
+    : statusCode(200), statusMessage("OK"), fileBodyEnabled(false),
+      fileOffset(0), fileLength(0) {}
 
 HttpResponse::HttpResponse(int code, const std::string &message)
-    : statusCode(code), statusMessage(message) {}
+    : statusCode(code), statusMessage(message), fileBodyEnabled(false),
+      fileOffset(0), fileLength(0) {}
 
 void HttpResponse::setStatus(int code, const std::string &message) {
   statusCode = code;
@@ -39,19 +42,40 @@ const std::string &HttpResponse::getHeader(const std::string &name) const {
 }
 
 void HttpResponse::setBody(const std::string &bodyContent) {
+  clearFileBody();
   body.assign(bodyContent.begin(), bodyContent.end());
   setContentLength(body.size());
 }
 
 void HttpResponse::setBody(const std::vector<char> &bodyContent) {
+  clearFileBody();
   body = bodyContent;
   setContentLength(body.size());
 }
 
 void HttpResponse::setBody(const char *data, size_t len) {
+  clearFileBody();
   body.assign(data, data + len);
   setContentLength(body.size());
 }
+
+void HttpResponse::setFileBody(const std::string &path, off_t offset,
+                               size_t length) {
+  body.clear();
+  fileBodyEnabled = true;
+  filePath = path;
+  fileOffset = offset;
+  fileLength = length;
+  setContentLength(length);
+}
+
+bool HttpResponse::hasFileBody() const { return fileBodyEnabled; }
+
+const std::string &HttpResponse::getFilePath() const { return filePath; }
+
+off_t HttpResponse::getFileOffset() const { return fileOffset; }
+
+size_t HttpResponse::getFileLength() const { return fileLength; }
 
 std::string HttpResponse::getBodyAsString() const {
   if (body.empty())
@@ -108,6 +132,13 @@ void HttpResponse::setContentLength(size_t len) {
 
 void HttpResponse::setContentType(const std::string &type) {
   setHeader("Content-Type", type);
+}
+
+void HttpResponse::clearFileBody() {
+  fileBodyEnabled = false;
+  filePath.clear();
+  fileOffset = 0;
+  fileLength = 0;
 }
 
 void HttpResponse::printResponse() const {

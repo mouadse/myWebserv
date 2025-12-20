@@ -34,6 +34,13 @@ public:
   bool wantWrite;       // whether we should switch to EPOLLOUT
   bool closeAfterWrite; // close connection after flushing buffer (Connection:
                         // close)
+  static const size_t STREAM_CHUNK_SIZE = 64 * 1024;
+  bool streaming;
+  int streamFd;
+  size_t streamRemaining;
+  std::vector<char> streamBuffer;
+  size_t streamBufferOffset;
+  size_t streamBufferSize;
   Client(int fd);
 };
 

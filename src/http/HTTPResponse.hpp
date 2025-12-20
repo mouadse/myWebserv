@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <sys/types.h>
 
 class HttpResponse {
 
@@ -28,7 +29,12 @@ private:
   std::string statusMessage;
   std::map<std::string, std::string> headers;
   std::vector<char> body; // Binary-safe body storage
+  bool fileBodyEnabled;
+  std::string filePath;
+  off_t fileOffset;
+  size_t fileLength;
   void setContentLength(size_t len);
+  void clearFileBody();
 
 public:
   HttpResponse();
@@ -40,6 +46,11 @@ public:
   void setBody(const std::string &bodyContent);
   void setBody(const std::vector<char> &bodyContent); // Binary-safe overload
   void setBody(const char *data, size_t len);         // Raw data overload
+  void setFileBody(const std::string &path, off_t offset, size_t length);
+  bool hasFileBody() const;
+  const std::string &getFilePath() const;
+  off_t getFileOffset() const;
+  size_t getFileLength() const;
   std::string getBodyAsString() const;
   const std::vector<char> &getBody() const;
   std::string toString() const;

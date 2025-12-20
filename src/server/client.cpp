@@ -30,6 +30,12 @@ Client::Client(int fd) {
   this->wantWrite = false;
   this->writeOffset = 0;
   this->closeAfterWrite = false;
+  this->streaming = false;
+  this->streamFd = -1;
+  this->streamRemaining = 0;
+  this->streamBufferOffset = 0;
+  this->streamBufferSize = 0;
+  this->streamBuffer.resize(STREAM_CHUNK_SIZE);
   if (Logger::isDebugEnabled())
     Logger::debug("Client state initialized");
 

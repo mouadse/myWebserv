@@ -12,6 +12,53 @@
 
 #include "server.hpp"
 #include "client.hpp"
+#include <sstream>
+
+namespace {
+void setHtmlError(HttpResponse &response, int code, const std::string &message,
+                  const std::string &detail) {
+  response.setStatus(code, message);
+  std::stringstream body;
+  body << "<html><head><title>" << code << " " << message << "</title></head>"
+       << "<body><h1>" << code << " " << message << "</h1>";
+  if (!detail.empty()) {
+    body << "<p>" << detail << "</p>";
+  }
+  body << "</body></html>";
+  response.setBody(body.str());
+  response.setHeader("Content-Type", "text/html");
+}
+
+bool startFileStream(Client *c, const HttpResponse &response) {
+  if (c == NULL)
+    return false;
+  int fd = open(response.getFilePath().c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+  if (response.getFileOffset() > 0) {
+    if (lseek(fd, response.getFileOffset(), SEEK_SET) < 0) {
+      close(fd);
+      return false;
+    }
+  }
+  c->streamFd = fd;
+  c->streamRemaining = response.getFileLength();
+  c->streamBufferOffset = 0;
+  c->streamBufferSize = 0;
+  c->streaming = true;
+  return true;
+}
+
+void stopFileStream(Client *c) {
+  if (c->streamFd >= 0)
+    close(c->streamFd);
+  c->streamFd = -1;
+  c->streamRemaining = 0;
+  c->streamBufferOffset = 0;
+  c->streamBufferSize = 0;
+  c->streaming = false;
+}
+} // namespace
 
 Server::Server() {
   Logger::log("Creating default server on port 8080");
@@ -228,6 +275,12 @@ void Server::readClient(int fd) {
         handler.process(c->request, c->response);
 
         // Append response to write buffer directly (avoids extra copy)
+        if (c->response.hasFileBody() && c->response.getFileLength() > 0) {
+          if (!startFileStream(c, c->response)) {
+            setHtmlError(c->response, 500, "Internal Server Error",
+                         "Could not open file.");
+          }
+        }
         c->response.toBuffer(c->writeBuffer);
         c->wantWrite = true;
 
@@ -317,12 +370,73 @@ void Server::writeClient(int fd) {
     }
   }
 
-  if (c->writeOffset >= total) {
+  if (c->writeOffset < total) {
+    // Still have data, keep EPOLLOUT
+    EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
+    if (Logger::isDebugEnabled())
+      Logger::debug("Partial write, " +
+                    Helpers::toString(total - c->writeOffset) +
+                    " bytes remaining");
+    return;
+  }
+
+  if (total > 0) {
     // Buffer fully sent - reset for next response
     c->writeBuffer.clear();
     c->writeOffset = 0;
-    c->wantWrite = false;
+  }
 
+  while (c->streaming) {
+    if (c->streamBufferOffset >= c->streamBufferSize) {
+      if (c->streamRemaining == 0) {
+        stopFileStream(c);
+        break;
+      }
+      size_t toRead = c->streamBuffer.size();
+      if (toRead > c->streamRemaining)
+        toRead = c->streamRemaining;
+      ssize_t r = read(c->streamFd, &c->streamBuffer[0], toRead);
+      if (r > 0) {
+        c->streamBufferSize = static_cast<size_t>(r);
+        c->streamBufferOffset = 0;
+      } else if (r == 0) {
+        Logger::warn("read() returned 0 on file FD: " +
+                     Helpers::toString(c->streamFd));
+        closeClient(fd);
+        return;
+      } else {
+        if (errno == EINTR)
+          continue;
+        Logger::error("read() failed on file FD: " +
+                      Helpers::toString(c->streamFd));
+        closeClient(fd);
+        return;
+      }
+    }
+
+    ssize_t n = write(fd, &c->streamBuffer[0] + c->streamBufferOffset,
+                      c->streamBufferSize - c->streamBufferOffset);
+    if (n > 0) {
+      c->streamBufferOffset += n;
+      c->streamRemaining -= static_cast<size_t>(n);
+    } else if (n == 0) {
+      Logger::warn("write() returned 0 on FD: " + Helpers::toString(fd) +
+                   ", closing connection");
+      closeClient(fd);
+      return;
+    } else {
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+        break; // Socket buffer full, wait for next EPOLLOUT
+      if (errno == EINTR)
+        continue; // Interrupted, retry
+      Logger::error("write() failed on FD: " + Helpers::toString(fd));
+      closeClient(fd);
+      return;
+    }
+  }
+
+  if (!c->streaming) {
+    c->wantWrite = false;
     if (c->closeAfterWrite) {
       if (Logger::isDebugEnabled())
         Logger::debug("Connection: close - closing FD: " +
@@ -335,12 +449,7 @@ void Server::writeClient(int fd) {
     if (Logger::isDebugEnabled())
       Logger::debug("Response fully sent on FD: " + Helpers::toString(fd));
   } else {
-    // Still have data, keep EPOLLOUT
     EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-    if (Logger::isDebugEnabled())
-      Logger::debug("Partial write, " +
-                    Helpers::toString(total - c->writeOffset) +
-                    " bytes remaining");
   }
 }
 
@@ -362,7 +471,10 @@ void Server::closeClient(int fd) {
     Logger::debug("close() called on FD: " + Helpers::toString(fd));
 
   if (clients.count(fd)) {
-    delete clients[fd];
+    Client *c = clients[fd];
+    if (c->streamFd >= 0)
+      stopFileStream(c);
+    delete c;
     clients.erase(fd);
     if (Logger::isDebugEnabled())
       Logger::debug("Client FD: " + Helpers::toString(fd) +
