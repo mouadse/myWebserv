@@ -19,7 +19,7 @@
 #include <iostream>
 
 static std::vector<Server> setServer(int argc, char **argv) {
-  std::string config_path = "./config/example.conf"; // Default config path
+  std::string config_path = "./config/demo.conf"; // Default config path
   if (argc > 1)
     config_path = argv[1];
 
