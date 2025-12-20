@@ -2,7 +2,6 @@
 #include "SignalHandling.hpp"
 #include "utils/Logger.hpp"
 
-#include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <stdexcept>
@@ -11,7 +10,7 @@
 int SignalHandling::s_writeFd = -1;
 volatile sig_atomic_t SignalHandling::s_stopRequested = 0;
 volatile sig_atomic_t SignalHandling::s_lastSignal = 0;
-SignalHandling* SignalHandling::s_instance = NULL;
+SignalHandling *SignalHandling::s_instance = NULL;
 
 SignalHandling::SignalHandling()
     : _pipeRead(-1), _pipeWrite(-1), _installed(false), _oldInt(SIG_DFL),
@@ -55,7 +54,8 @@ void SignalHandling::install() {
     return;
 
   if (s_instance != NULL && s_instance != this)
-    throw std::runtime_error("Only one SignalHandling instance may be installed at a time");
+    throw std::runtime_error(
+        "Only one SignalHandling instance may be installed at a time");
 
   int fds[2];
   if (::pipe(fds) < 0)
@@ -123,10 +123,7 @@ void SignalHandling::consume() {
     ssize_t n = ::read(_pipeRead, buf, sizeof(buf));
     if (n > 0)
       continue;
-    if (n == 0)
-      break;
-    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-      break;
+    // n <= 0: EOF or error, stop consuming
     break;
   }
 }

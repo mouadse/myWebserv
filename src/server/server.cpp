@@ -58,6 +58,19 @@ void stopFileStream(Client *c) {
   c->streamBufferSize = 0;
   c->streaming = false;
 }
+
+void logWriteFailure(Client *c, int fd, const char *callName) {
+  if (c != NULL && c->fileResponse) {
+    if (Logger::isDebugEnabled())
+      Logger::debug(std::string(callName) + "() failed on FD: " +
+                    Helpers::toString(fd) + " Error: " +
+                    std::string(strerror(errno)));
+  } else {
+    Logger::error(std::string(callName) + "() failed on FD: " +
+                  Helpers::toString(fd) + " Error: " +
+                  std::string(strerror(errno)));
+  }
+}
 } // namespace
 
 Server::Server() {
@@ -230,8 +243,8 @@ void Server::acceptClient() {
 
     clients[client_fd] = new Client(client_fd);
 
-    // Edge-triggered epoll with EPOLLRDHUP for efficient event handling
-    EpollManager::getInstance().add(client_fd, EPOLLIN | EPOLLRDHUP | EPOLLET);
+    // Level-triggered epoll (no EPOLLET) with EPOLLRDHUP
+    EpollManager::getInstance().add(client_fd, EPOLLIN | EPOLLRDHUP);
 
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &clientAddr.sin_addr, ip, INET_ADDRSTRLEN);
@@ -255,80 +268,74 @@ void Server::readClient(int fd) {
   Client *c = it->second;
   char buf[16384]; // 16KB stack buffer for efficiency
 
-  // Read loop - drain until EAGAIN (edge-triggered)
-  while (true) {
-    ssize_t n = read(fd, buf, sizeof(buf));
+  ssize_t n = read(fd, buf, sizeof(buf));
 
-    if (n > 0) {
-      c->request.addData(buf, n); // Zero-copy overload
+  if (n > 0) {
+    c->request.addData(buf, n); // Zero-copy overload
+    if (Logger::isDebugEnabled())
+      Logger::debug("Added " + Helpers::toString(n) +
+                    " bytes to request buffer");
+
+    // Process all complete requests in the buffer
+    while (c->request.isComplete() && !c->request.hasError()) {
       if (Logger::isDebugEnabled())
-        Logger::debug("Added " + Helpers::toString(n) +
-                      " bytes to request buffer");
+        Logger::debug("Request complete on FD: " + Helpers::toString(fd));
 
-      // Pipelining loop: process all complete requests
-      while (c->request.isComplete() && !c->request.hasError()) {
-        if (Logger::isDebugEnabled())
-          Logger::debug("Request complete on FD: " + Helpers::toString(fd));
+      // Process this request
+      RequestHandler handler(config);
+      handler.process(c->request, c->response);
 
-        // Process this request
-        RequestHandler handler(config);
-        handler.process(c->request, c->response);
-
-        // Append response to write buffer directly (avoids extra copy)
-        if (c->response.hasFileBody() && c->response.getFileLength() > 0) {
-          if (!startFileStream(c, c->response)) {
-            setHtmlError(c->response, 500, "Internal Server Error",
-                         "Could not open file.");
-          }
+      // Append response to write buffer directly
+      if (c->response.hasFileBody() && c->response.getFileLength() > 0) {
+        if (!startFileStream(c, c->response)) {
+          setHtmlError(c->response, 500, "Internal Server Error",
+                       "Could not open file.");
         }
-        c->response.toBuffer(c->writeBuffer);
-        c->wantWrite = true;
+      }
+      bool isFile = c->streaming;
+      if (!isFile && c->response.hasHeader("Accept-Ranges"))
+        isFile = true;
+      if (isFile)
+        c->fileResponse = true;
+      c->response.toBuffer(c->writeBuffer);
+      c->wantWrite = true;
 
-        // Check Connection: close header
-        std::string conn = c->request.getHeader("connection");
-        if (conn == "close") {
-          c->closeAfterWrite = true;
-        }
-
-        // Reset for next request (preserves leftover data in buffer)
-        c->request.reset();
-        c->response = HttpResponse(); // Reset response for next request
+      // Check Connection: close header
+      std::string conn = c->request.getHeader("connection");
+      if (conn == "close") {
+        c->closeAfterWrite = true;
       }
 
-      if (c->request.hasError())
-        break;
+      // Reset for next request
+      c->request.reset();
+      c->response = HttpResponse();
+    }
 
-    } else if (n == 0) {
-      if (Logger::isDebugEnabled())
-        Logger::debug("Client FD: " + Helpers::toString(fd) +
-                      " disconnected (read 0 bytes)");
-      closeClient(fd);
-      return;
-    } else {
-      if (errno == EINTR)
-        continue;
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        break; // No more data available
-      Logger::error("read() failed on FD: " + Helpers::toString(fd) + ": " +
-                    std::string(strerror(errno)));
+    if (c->request.hasError()) {
+      Logger::warn("Request has error, closing client FD: " +
+                   Helpers::toString(fd));
       closeClient(fd);
       return;
     }
-  }
 
-  if (c->request.hasError()) {
-    Logger::warn("Request has error, closing client FD: " +
-                 Helpers::toString(fd));
-    closeClient(fd);
-    return;
-  }
+    // If we have data to write, switch to EPOLLOUT
+    if (c->wantWrite && !c->writeBuffer.empty()) {
+      EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP);
+      if (Logger::isDebugEnabled())
+        Logger::debug("Modified FD: " + Helpers::toString(fd) +
+                      " to EPOLLOUT for writing");
+    }
 
-  // If we have data to write, switch to EPOLLOUT
-  if (c->wantWrite && !c->writeBuffer.empty()) {
-    EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
+  } else if (n == 0) {
     if (Logger::isDebugEnabled())
-      Logger::debug("Modified FD: " + Helpers::toString(fd) +
-                    " to EPOLLOUT for writing");
+      Logger::debug("Client FD: " + Helpers::toString(fd) +
+                    " disconnected (read 0 bytes)");
+    closeClient(fd);
+  } else {
+    // n < 0: Real error
+    Logger::error("read() failed on FD: " + Helpers::toString(fd) +
+                  " Error: " + std::string(strerror(errno)));
+    closeClient(fd);
   }
 }
 
@@ -345,38 +352,31 @@ void Server::writeClient(int fd) {
   Client *c = it->second;
   size_t total = c->writeBuffer.size();
 
-  // Drain write buffer until EAGAIN (edge-triggered requires full drain)
-  while (c->writeOffset < total) {
-    ssize_t n =
-        write(fd, &c->writeBuffer[0] + c->writeOffset, total - c->writeOffset);
+  // Write data if buffer has content
+  if (c->writeOffset < total) {
+    ssize_t n = send(fd, &c->writeBuffer[0] + c->writeOffset,
+                     total - c->writeOffset, MSG_NOSIGNAL);
     if (n > 0) {
       c->writeOffset += n;
       if (Logger::isDebugEnabled())
-        Logger::debug("write() sent " + Helpers::toString(n) +
+        Logger::debug("send() sent " + Helpers::toString(n) +
                       " bytes on FD: " + Helpers::toString(fd));
     } else if (n == 0) {
-      Logger::warn("write() returned 0 on FD: " + Helpers::toString(fd) +
+      Logger::warn("send() returned 0 on FD: " + Helpers::toString(fd) +
                    ", closing connection");
       closeClient(fd);
       return;
-    } else if (n < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        break; // Socket buffer full, wait for next EPOLLOUT
-      if (errno == EINTR)
-        continue; // Interrupted, retry
-      Logger::error("write() failed on FD: " + Helpers::toString(fd));
+    } else {
+      // n < 0: Real error
+      logWriteFailure(c, fd, "send");
       closeClient(fd);
       return;
     }
   }
 
+  // If we still have data in write buffer, stay in EPOLLOUT and return
+  // (Level Triggered: epoll will fire again when writable)
   if (c->writeOffset < total) {
-    // Still have data, keep EPOLLOUT
-    EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-    if (Logger::isDebugEnabled())
-      Logger::debug("Partial write, " +
-                    Helpers::toString(total - c->writeOffset) +
-                    " bytes remaining");
     return;
   }
 
@@ -384,73 +384,95 @@ void Server::writeClient(int fd) {
     // Buffer fully sent - reset for next response
     c->writeBuffer.clear();
     c->writeOffset = 0;
+
+    // Safety: Return here to ensure we don't double-write in one event.
+    // If we have streaming to do, wait for next EPOLLOUT.
+    if (c->streaming) {
+      return;
+    }
   }
 
-  while (c->streaming) {
+  // Handle file streaming
+  if (c->streaming) {
+    // Refill buffer if needed
     if (c->streamBufferOffset >= c->streamBufferSize) {
       if (c->streamRemaining == 0) {
         stopFileStream(c);
-        break;
+      } else {
+        size_t toRead = c->streamBuffer.size();
+        if (toRead > c->streamRemaining)
+          toRead = c->streamRemaining;
+        ssize_t r = read(c->streamFd, &c->streamBuffer[0], toRead);
+        if (r > 0) {
+          c->streamBufferSize = static_cast<size_t>(r);
+          c->streamBufferOffset = 0;
+        } else if (r == 0) {
+          Logger::warn("read() returned 0 on file FD: " +
+                       Helpers::toString(c->streamFd));
+          closeClient(fd);
+          return;
+        } else {
+          // r < 0: disk read failure
+          Logger::error("read() failed on file FD: " +
+                        Helpers::toString(c->streamFd));
+          closeClient(fd);
+          return;
+        }
       }
-      size_t toRead = c->streamBuffer.size();
-      if (toRead > c->streamRemaining)
-        toRead = c->streamRemaining;
-      ssize_t r = read(c->streamFd, &c->streamBuffer[0], toRead);
-      if (r > 0) {
-        c->streamBufferSize = static_cast<size_t>(r);
-        c->streamBufferOffset = 0;
-      } else if (r == 0) {
-        Logger::warn("read() returned 0 on file FD: " +
-                     Helpers::toString(c->streamFd));
+    }
+
+    // If still streaming, write to socket using what we have in buffer
+    if (c->streaming && c->streamBufferSize > 0) {
+      // ssize_t n = write(fd, &c->streamBuffer[0] + c->streamBufferOffset,
+      //                   c->streamBufferSize - c->streamBufferOffset);
+      ssize_t n =
+          send(fd, &c->streamBuffer[0] + c->streamBufferOffset,
+               c->streamBufferSize - c->streamBufferOffset, MSG_NOSIGNAL);
+      if (n > 0) {
+        c->streamBufferOffset += n;
+        c->streamRemaining -= static_cast<size_t>(n);
+      } else if (n == 0) {
+        Logger::warn("send() returned 0 on FD: " + Helpers::toString(fd) +
+                     ", closing connection");
         closeClient(fd);
         return;
       } else {
-        if (errno == EINTR)
-          continue;
-        Logger::error("read() failed on file FD: " +
-                      Helpers::toString(c->streamFd));
+        // n < 0: Real error
+        logWriteFailure(c, fd, "send");
         closeClient(fd);
+        return;
+      }
+
+      // If we didn't write everything, return and wait for next EPOLLOUT
+      if (c->streamBufferOffset < c->streamBufferSize) {
         return;
       }
     }
 
-    ssize_t n = write(fd, &c->streamBuffer[0] + c->streamBufferOffset,
-                      c->streamBufferSize - c->streamBufferOffset);
-    if (n > 0) {
-      c->streamBufferOffset += n;
-      c->streamRemaining -= static_cast<size_t>(n);
-    } else if (n == 0) {
-      Logger::warn("write() returned 0 on FD: " + Helpers::toString(fd) +
-                   ", closing connection");
-      closeClient(fd);
-      return;
-    } else {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        break; // Socket buffer full, wait for next EPOLLOUT
-      if (errno == EINTR)
-        continue; // Interrupted, retry
-      Logger::error("write() failed on FD: " + Helpers::toString(fd));
-      closeClient(fd);
+    // If streaming is still active here, it means we consumed our current
+    // buffer but have more to read from disk. We return to let the next
+    // cycle/event handle it. However, for efficiency, since we just drained our
+    // buffer to the socket, we COULD try to refill and write again, but in
+    // Level Triggered we can just return. But we must stay in EPOLLOUT.
+    if (c->streaming) {
       return;
     }
   }
 
-  if (!c->streaming) {
-    c->wantWrite = false;
-    if (c->closeAfterWrite) {
-      if (Logger::isDebugEnabled())
-        Logger::debug("Connection: close - closing FD: " +
-                      Helpers::toString(fd));
-      closeClient(fd);
-      return;
-    }
-
-    EpollManager::getInstance().mod(fd, EPOLLIN | EPOLLRDHUP | EPOLLET);
+  // Done writing (buffer empty and not streaming)
+  c->wantWrite = false;
+  c->fileResponse = false;
+  if (c->closeAfterWrite) {
     if (Logger::isDebugEnabled())
-      Logger::debug("Response fully sent on FD: " + Helpers::toString(fd));
-  } else {
-    EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
+      Logger::debug("Connection: close - closing FD: " + Helpers::toString(fd));
+    closeClient(fd);
+    return;
   }
+
+  // Switch back to EPOLLIN
+  EpollManager::getInstance().mod(fd, EPOLLIN | EPOLLRDHUP);
+  if (Logger::isDebugEnabled())
+    Logger::debug("Response fully sent on FD: " + Helpers::toString(fd));
 }
 
 void Server::closeClient(int fd) {

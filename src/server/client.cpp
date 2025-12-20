@@ -30,6 +30,7 @@ Client::Client(int fd) {
   this->wantWrite = false;
   this->writeOffset = 0;
   this->closeAfterWrite = false;
+  this->fileResponse = false;
   this->streaming = false;
   this->streamFd = -1;
   this->streamRemaining = 0;

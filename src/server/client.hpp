@@ -34,6 +34,7 @@ public:
   bool wantWrite;       // whether we should switch to EPOLLOUT
   bool closeAfterWrite; // close connection after flushing buffer (Connection:
                         // close)
+  bool fileResponse;    // queued response includes a file/range payload
   static const size_t STREAM_CHUNK_SIZE = 64 * 1024;
   bool streaming;
   int streamFd;
