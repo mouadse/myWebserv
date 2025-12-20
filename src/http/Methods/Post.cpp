@@ -2,6 +2,7 @@
 #include "../../utils/PathUtils.hpp"
 #include <algorithm>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <limits.h>
@@ -43,6 +44,43 @@ std::string sanitizeFilename(const std::string &filename) {
   }
   return sanitized;
 }
+
+std::string generateTimestampFilename(const std::string &contentType) {
+  std::time_t now = std::time(NULL);
+  std::stringstream ss;
+  ss << "upload_" << now;
+
+  // Try to extract extension from Content-Type (e.g., "image/png" -> ".png")
+  std::string ext = ".bin";
+  size_t slashPos = contentType.find('/');
+  if (slashPos != std::string::npos) {
+    std::string subtype = contentType.substr(slashPos + 1);
+    // Remove any parameters after semicolon
+    size_t semiPos = subtype.find(';');
+    if (semiPos != std::string::npos) {
+      subtype = subtype.substr(0, semiPos);
+    }
+    // Trim whitespace
+    size_t start = subtype.find_first_not_of(" \t");
+    size_t end = subtype.find_last_not_of(" \t");
+    if (start != std::string::npos && end != std::string::npos) {
+      subtype = subtype.substr(start, end - start + 1);
+    }
+    // Map common MIME types to extensions
+    if (subtype == "jpeg") {
+      ext = ".jpg";
+    } else if (subtype == "plain") {
+      ext = ".txt";
+    } else if (subtype == "octet-stream") {
+      ext = ".bin";
+    } else if (!subtype.empty() && subtype.length() <= 10) {
+      ext = "." + subtype;
+    }
+  }
+
+  ss << ext;
+  return ss.str();
+}
 } // namespace
 
 void Post::handle(const HTTPRequest &request, HttpResponse &response,
@@ -64,17 +102,25 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
     struct stat pathStat;
     bool pathExists = (stat(path.c_str(), &pathStat) == 0);
 
-    if (pathExists && S_ISDIR(pathStat.st_mode)) {
-      setError(response, 400,
-               "Bad Request: Cannot POST binary data to a directory");
-      return;
-    }
+    bool isDirectory = (pathExists && S_ISDIR(pathStat.st_mode));
+    bool endsWithSlash =
+        (!target.empty() && target[target.length() - 1] == '/');
 
-    if (!target.empty() && target[target.length() - 1] == '/') {
-      setError(
-          response, 400,
-          "Bad Request: Cannot POST binary data to a path ending with '/'");
-      return;
+    if (isDirectory || endsWithSlash) {
+      if (endsWithSlash && !pathExists) {
+        std::cerr << "Error: Directory does not exist at " << path << std::endl;
+        setError(response, 404, "Not Found: Target directory does not exist");
+        return;
+      }
+      if (endsWithSlash && !S_ISDIR(pathStat.st_mode)) {
+        std::cerr << "Error: Path is not a directory at " << path << std::endl;
+        setError(response, 400,
+                 "Bad Request: Target path is not a directory");
+        return;
+      }
+      std::string generatedFilename = generateTimestampFilename(contentType);
+      path = joinPaths(path, generatedFilename);
+      target = joinPaths(target, generatedFilename);
     }
 
     const std::vector<char> &body = request.getBody();
@@ -83,7 +129,7 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
       std::cerr << "Error: Could not open file for writing at " << path
                 << std::endl;
       setError(response, 500,
-               "Internal Server Error: Could not open file for writing");
+               "Internal Server Error: Could not create file in target path");
       return;
     }
 

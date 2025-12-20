@@ -311,7 +311,7 @@ void HTTPRequest::parseQueryParams() {
     return;
 
   std::string path = target.substr(0, qpos);
-  std::string query_string = target.substr(qpos + 1);
+  query_string = target.substr(qpos + 1);
   target = path;
   std::string::size_type start = 0;
   while (start < query_string.size()) {
