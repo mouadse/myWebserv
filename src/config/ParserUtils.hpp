@@ -15,5 +15,6 @@ unsigned int hexToUint(const std::string &hex);
 std::string statusCodeToString(short statusCode);
 std::string trimWhitespace(const std::string &value);
 void enforceTrailingSemicolon(std::string &token, const std::string &context);
+size_t parseBodySizeWithSuffix(const std::string &value);
 
 #endif

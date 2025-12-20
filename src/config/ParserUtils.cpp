@@ -162,3 +162,39 @@ std::string statusCodeToString(short statusCode) {
     return ("Undefined");
   }
 }
+
+size_t parseBodySizeWithSuffix(const std::string &value) {
+  if (value.empty()) {
+    throw std::invalid_argument("Body size value cannot be empty");
+  }
+
+  std::string numeric_part = value;
+  size_t multiplier = 1;
+
+  char last_char = value[value.size() - 1];
+  if (last_char == 'M' || last_char == 'm') {
+    multiplier = 1024UL * 1024UL;
+    numeric_part = value.substr(0, value.size() - 1);
+  } else if (last_char == 'G' || last_char == 'g') {
+    multiplier = 1024UL * 1024UL * 1024UL;
+    numeric_part = value.substr(0, value.size() - 1);
+  }
+
+  if (numeric_part.empty() || !isAllDigits(numeric_part)) {
+    throw std::invalid_argument("Invalid body size value: " + value);
+  }
+
+  std::stringstream ss(numeric_part);
+  unsigned long num = 0;
+  ss >> num;
+
+  if (ss.fail()) {
+    throw std::invalid_argument("Body size value out of range: " + value);
+  }
+
+  if (num == 0) {
+    throw std::invalid_argument("Body size must be greater than zero");
+  }
+
+  return static_cast<size_t>(num * multiplier);
+}

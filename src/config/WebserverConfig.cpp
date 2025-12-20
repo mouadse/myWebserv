@@ -111,12 +111,7 @@ void WebserverConfig::setPort(std::string value) {
 
 void WebserverConfig::setClientMaxBodySize(std::string value) {
   value = normalizeDirective(value, "client_max_body_size");
-  if (!isAllDigits(value))
-    throw std::runtime_error("Wrong syntax: client_max_body_size");
-  size_t size = static_cast<size_t>(stoiStrict(value));
-  if (size == 0)
-    throw std::runtime_error("Wrong syntax: client_max_body_size");
-  _max_body_size = size;
+  _max_body_size = parseBodySizeWithSuffix(value);
 }
 
 void WebserverConfig::setIndex(std::string index) {

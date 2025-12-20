@@ -76,17 +76,11 @@ void LocationBlock::setAutoindex(const std::string &autoindex) {
   }
 }
 
-void LocationBlock::setIndex(const std::string &index) {
-  _index = index;
-}
+void LocationBlock::setIndex(const std::string &index) { _index = index; }
 
-void LocationBlock::setReturn(const std::string &ret) {
-  _return = ret;
-}
+void LocationBlock::setReturn(const std::string &ret) { _return = ret; }
 
-void LocationBlock::setAlias(const std::string &alias) {
-  _alias = alias;
-}
+void LocationBlock::setAlias(const std::string &alias) { _alias = alias; }
 
 void LocationBlock::setCgiPaths(const std::vector<std::string> &paths) {
   _cgi_paths = paths;
@@ -98,17 +92,7 @@ void LocationBlock::setCgiExtensions(
 }
 
 void LocationBlock::setMaxBodySize(const std::string &size_str) {
-  unsigned long size = 0;
-  if (!isAllDigits(size_str)) {
-    throw std::runtime_error("Max body size must be a positive integer: " +
-                             size_str);
-  }
-  size = static_cast<unsigned long>(stoiStrict(size_str));
-  if (!size) {
-    throw std::runtime_error("Max body size must be greater than zero: " +
-                             size_str);
-  }
-  _max_body_size = size;
+  _max_body_size = parseBodySizeWithSuffix(size_str);
 }
 
 void LocationBlock::setMaxBodySize(unsigned long size) {
