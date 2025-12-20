@@ -1,18 +1,13 @@
 #ifndef POST_HPP
 #define POST_HPP
 
-#include "config/LocationBlock.hpp"
 #include "../HTTPRequest.hpp"
 #include "../HTTPResponse.hpp"
-#include "MultipartParser.hpp"
+#include "../../config/LocationBlock.hpp"
 
-class POST
-{
-    private : 
-
-    public :
-    static void handle(const HTTPRequest &request, HttpResponse &response,
-                     const LocationBlock &location);
+class Post {
+public:
+    static void handle(const HTTPRequest &request, HttpResponse &response, const LocationBlock &location);
 };
 
 #endif

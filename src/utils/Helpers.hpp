@@ -65,5 +65,7 @@ class Helpers {
 
         static FdInfo findServerByFd(int fd, const std::vector<Server> &servers);
 
+        static std::string escapeHtml(const std::string &data);
+
 };
 

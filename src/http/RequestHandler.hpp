@@ -36,6 +36,8 @@ class RequestHandler {
         void handleCGI(const HTTPRequest &request, HttpResponse &response);
         void setCommonHeaders(HttpResponse &response);
         void handleError(int errorCode, const std::string &errorMessage, HttpResponse &response);
+        void respondMethodNotAllowed(const LocationBlock &location,
+                                     HttpResponse &response);
 
         void handleMultipartPOST(const HTTPRequest &request, const LocationBlock &loc,  HttpResponse &response);
         void handleUrlEncodedPOST(const HTTPRequest &request, const LocationBlock &loc, HttpResponse &response);

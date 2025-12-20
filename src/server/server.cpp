@@ -283,7 +283,7 @@ void Server::writeClient(int fd) {
 
   // Drain write buffer until EAGAIN (edge-triggered requires full drain)
   while (c->writeOffset < total) {
-    ssize_t n = write(fd, c->writeBuffer.data() + c->writeOffset,
+    ssize_t n = write(fd, &c->writeBuffer[0] + c->writeOffset,
                       total - c->writeOffset);
     if (n > 0) {
       c->writeOffset += n;

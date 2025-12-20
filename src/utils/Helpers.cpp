@@ -57,3 +57,19 @@ Helpers::FdInfo Helpers::findServerByFd(int fd, const std::vector<Server> &serve
     return result;
 }
 
+std::string Helpers::escapeHtml(const std::string &data) {
+    std::string buffer;
+    buffer.reserve(data.size() * 1.1);
+    for (size_t i = 0; i < data.size(); ++i) {
+        switch (data[i]) {
+            case '&':  buffer += "&amp;"; break;
+            case '\"': buffer += "&quot;"; break;
+            case '\'': buffer += "&apos;"; break;
+            case '<':  buffer += "&lt;"; break;
+            case '>':  buffer += "&gt;"; break;
+            default:   buffer += data[i]; break;
+        }
+    }
+    return buffer;
+}
+

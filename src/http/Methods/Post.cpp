@@ -1,206 +1,199 @@
 #include "Post.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <sys/stat.h>
+#include <algorithm>
+#include <unistd.h>
+#include <cstring>
+#include <limits.h>
 
-
-
-static void handleError(int errorCode, const std::string &errorMessage,
-                                 HttpResponse &response) {
-
-  response.setStatus(errorCode, errorMessage);
-  std::stringstream body;
-  body << "<html><head><title>" << errorCode << " " << errorMessage
-       << "</title></head>"
-       << "<body><h1>" << errorCode << " " << errorMessage << "</h1>"
-       << "<p>The request could not be processed.</p>"
-       << "</body></html>";
-
-  response.setBody(body.str());
-  response.setHeader("Content-Type", "text/html");
-}
-
-
-static std::string  sanitizeFilename(std::string name)
-{
-    size_t p = name.find_last_of("/\\");
-    if (p != std::string::npos)
-        name = name.substr(p + 1);
-    if (name.size() > 255)
-    {
-        errno = EFBIG;
-        throw std::runtime_error("filename too long");
+namespace {
+    std::string joinPaths(const std::string &base, const std::string &relative) {
+        if (relative.empty()) return base;
+        std::string rel = relative;
+        if (!rel.empty() && rel[0] == '/') rel.erase(0, 1);
+        if (base.empty()) return rel;
+        if (base[base.size() - 1] == '/') return base + rel;
+        return base + "/" + rel;
     }
 
-    if (name.empty() || name == "." || name == ".." || name[0] == '.')
-        throw std::runtime_error("bad filename");
-
-    std::string clean;
-    for (size_t i = 0; i < name.size(); i++)
-    {
-        if (isalnum(name[i]) || name[i] == '.' || name[i] == '_' || name[i] == '-')
-            clean += name[i];
-    }
-    if (clean.empty())
-        throw std::runtime_error("bad filename");
-    name = clean;
-
-
-    return name;
-}
-
-
-void POST::handle(const HTTPRequest &request, HttpResponse &response, const LocationBlock &location)
-{
-    const std::string &target = request.getTarget();
-
-    if (target.find("..") != std::string::npos ||
-        target.find("%2e%2e") != std::string::npos ||
-        target.find("%2E%2E") != std::string::npos)
-    {
-        response.setStatus(403, "Forbidden");
-        return;
-    }
-
-    unsigned long limit = location.getMaxBodySize();
-    if (request.getBody().size() > limit)
-    {
-        handleError(413, "Payload Too Large", response);
-        return;
-    }
-    std::string ct = request.getHeader("Content-Type");
-
-    std::string ctLower = ct;
-    for (size_t i = 0; i < ctLower.size(); i++)
-        ctLower[i] = tolower(ctLower[i]);
-
-    if (ctLower.find("multipart/form-data") == std::string::npos)
-    {
-        response.setStatus(415, "Unsupported Media Type");
-        return;
-    }
-
-    if (ct.empty())
-    {
-        response.setStatus(400, "Bad Request");
-        response.setBody("Missing Content-Type");
-        return;
-    }
-
-    if (ct.find("multipart/form-data") == std::string::npos)
-    {
-        response.setStatus(415, "Unsupported Media Type");
-        response.setBody("POST supports only multipart/form-data");
+    void setError(HttpResponse &response, int code, const std::string &message) {
+        response.setStatus(code, message);
+        std::stringstream body;
+        body << "<html><body><h1>" << code << " " << message << "</h1></body></html>";
+        response.setBody(body.str());
         response.setHeader("Content-Type", "text/html");
-        return;
-    }
-    size_t pos = ct.find("boundary=");
-    if (pos == std::string::npos)
-    {
-        response.setStatus(400, "Bad Request");
-        response.setBody("Missing multipart boundary");
-        return;
     }
 
-    const std::string boundary = "--" + ct.substr(pos + 9);
-    if (boundary.empty())
-    {
-        response.setStatus(400, "Bad Request");
-        response.setBody("Empty boundary");
-        return;
-    }
-    try {
-        MultipartParser parser(boundary, request.getBody());
-
-        while (parser.hasNextPart())
-        {
-            Part part = parser.nextPart();
-            if (part.filename.empty())
-            {
-                response.setStatus(400, "Bad Request");
-                return;
-            }
-
-            try
-            {
-                std::string filename = sanitizeFilename(part.filename);
-                
-                if (filename.empty())
-                {
-                    response.setStatus(400, "Bad Request");
-                    return;
-                }
-                std::string root = location.getRoot();
-                if (!root.empty() && root[root.size() - 1] == '/')
-                    root.erase(root.size() - 1);
-
-                std::string target = request.getTarget();
-                if (target.empty() || target[0] != '/')
-                {
-                    response.setStatus(400, "Bad Request");
-                    return;
-                }
-                if (target.find("..") != std::string::npos)
-                {
-                    response.setStatus(400, "Bad Request");
-                    return;
-                }
-
-
-                std::string basePath =  root + request.getTarget();
-                if (!basePath.empty() && basePath[basePath.size() - 1] != '/')
-                  basePath += '/';
-                std::string path = basePath + filename;
-
-                struct stat st;
-                if (stat(basePath.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
-                {
-                    response.setStatus(403, "Not Found");
-                    return;
-                }
-
-                if (access(basePath.c_str(), W_OK) != 0)
-                {
-                    handleError(404, "Forbidden: Upload directory is not writable", response);
-                    return;
-                }
-                std::cout << "Path = " << path << std::endl;
-                int i = 1;
-              std::string base = filename;
-              while (access(path.c_str(), F_OK) == 0)
-              {
-                std::ostringstream oss;
-                oss << i++;
-                filename = oss.str() + "_" + base;
-                path = basePath + filename;
-              }
-
-
-                std::ofstream file(path.c_str(), std::ios::binary);
-                if (!file.is_open())
-                {
-                    handleError(500, "Internal Server Error", response);
-                    return;
-                }
-                file.write(part.data.data(), part.data.size());
-                file.close();
-            }
-            catch (...)
-            {
-                if (errno == EFBIG)
-                    response.setStatus(413, "Payload Too Large");
-                else
-                    response.setStatus(400, "Bad Request");
-                return;
-            }
-
+    std::string sanitizeFilename(const std::string &filename) {
+        std::string base = filename;
+        size_t lastSlash = base.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            base = base.substr(lastSlash + 1);
         }
-
-        response.setStatus(201, "Created");
-        response.setBody("Upload successful");
-      }
-      catch (...) {
-          response.setStatus(400, "Bad Request");
-          response.setBody("Invalid multipart body");
-          return;
-      }
-      return;
+        
+        std::string sanitized;
+        std::string allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_";
+        for (size_t i = 0; i < base.size(); ++i) {
+            if (allowed.find(base[i]) != std::string::npos) {
+                sanitized += base[i];
+            }
+        }
+        
+        if (sanitized.empty() || sanitized == "." || sanitized == "..") {
+            return "";
+        }
+        if (sanitized.length() > 255) {
+            sanitized = sanitized.substr(0, 255);
+        }
+        return sanitized;
+    }
 }
 
+void Post::handle(const HTTPRequest &request, HttpResponse &response, const LocationBlock &location) {
+    std::string contentType = request.getHeader("Content-Type");
+    if (contentType.find("multipart/form-data") == std::string::npos) {
+        setError(response, 400, "Bad Request: Content-Type must be multipart/form-data");
+        return;
+    }
+
+    size_t boundaryPos = contentType.find("boundary=");
+    if (boundaryPos == std::string::npos) {
+        setError(response, 400, "Bad Request: Boundary missing");
+        return;
+    }
+
+    std::string boundaryParam = contentType.substr(boundaryPos + 9);
+    size_t semiPos = boundaryParam.find(';');
+    if (semiPos != std::string::npos) {
+        boundaryParam = boundaryParam.substr(0, semiPos);
+    }
+    
+    // Trim whitespace
+    size_t first = boundaryParam.find_first_not_of(" \t");
+    if (first == std::string::npos) {
+         setError(response, 400, "Bad Request: Empty boundary");
+         return;
+    }
+    size_t last = boundaryParam.find_last_not_of(" \t");
+    boundaryParam = boundaryParam.substr(first, (last - first + 1));
+
+    // Remove surrounding quotes if present
+    if (boundaryParam.size() >= 2 && boundaryParam[0] == '"' && boundaryParam[boundaryParam.size() - 1] == '"') {
+        boundaryParam = boundaryParam.substr(1, boundaryParam.size() - 2);
+    }
+
+    std::string boundary = "--" + boundaryParam;
+    const std::vector<char>& body = request.getBody();
+
+    // Find first boundary
+    std::vector<char>::const_iterator it = std::search(body.begin(), body.end(), boundary.begin(), boundary.end());
+    if (it == body.end()) {
+        setError(response, 400, "Bad Request: Start boundary not found");
+        return;
+    }
+
+    // Move past the first boundary + CRLF (assuming \r\n)
+    // Note: The boundary might be followed by \r\n
+    if (std::distance(it, body.end()) < static_cast<long>(boundary.size())) {
+         setError(response, 400, "Bad Request: Malformed body");
+         return;
+    }
+    it += boundary.size();
+    if (it != body.end() && *it == '\r') it++;
+    if (it != body.end() && *it == '\n') it++;
+
+    // Find headers end (\r\n\r\n)
+    const char* crlf2 = "\r\n\r\n";
+    std::vector<char>::const_iterator headerEnd = std::search(it, body.end(), crlf2, crlf2 + 4);
+    if (headerEnd == body.end()) {
+        setError(response, 400, "Bad Request: Header end not found");
+        return;
+    }
+
+    // Parse headers to find filename
+    std::string headers(it, headerEnd);
+    size_t filenamePos = headers.find("filename=\"");
+    if (filenamePos == std::string::npos) {
+         setError(response, 400, "Bad Request: Filename not found");
+         return;
+    }
+    
+    filenamePos += 10;
+    size_t filenameEnd = headers.find("\"", filenamePos);
+    if (filenameEnd == std::string::npos) {
+        setError(response, 400, "Bad Request: Filename parsing error");
+        return;
+    }
+    std::string rawFilename = headers.substr(filenamePos, filenameEnd - filenamePos);
+    std::string filename = sanitizeFilename(rawFilename);
+    if (filename.empty()) {
+        setError(response, 400, "Bad Request: Invalid filename");
+        return;
+    }
+
+    // Content starts after \r\n\r\n
+    std::vector<char>::const_iterator contentStart = headerEnd + 4;
+    
+    // Find next boundary
+    std::vector<char>::const_iterator contentEnd = std::search(contentStart, body.end(), boundary.begin(), boundary.end());
+    
+    // Check if there is a CRLF before the boundary
+    if (contentEnd != body.begin()) {
+        std::vector<char>::const_iterator temp = contentEnd;
+        temp--;
+        if (*temp == '\n') {
+            if (temp != body.begin()) {
+                std::vector<char>::const_iterator prev = temp;
+                prev--;
+                if (*prev == '\r') {
+                    contentEnd = prev;
+                } else {
+                    contentEnd = temp;
+                }
+            } else {
+                contentEnd = temp;
+            }
+        }
+    }
+
+    std::string uploadPath;
+    std::string locationPath = location.getPath();
+
+    if (!location.getAlias().empty() && request.getTarget().rfind(locationPath, 0) == 0) { // Check if target starts with locationPath
+        // If an alias is defined and the target matches the location path, use the alias.
+        // The target needs to have the location block's path stripped
+        // and then the alias prepended.
+        std::string relativeTarget = request.getTarget().substr(locationPath.length());
+        uploadPath = joinPaths(location.getAlias(), relativeTarget);
+    } else {
+        // Otherwise, use the root as before.
+        uploadPath = joinPaths(location.getRoot(), request.getTarget());
+    }
+
+    std::string path = joinPaths(uploadPath, filename);
+
+    // Ensure the directory exists or at least matches the location root/target
+    // Here we assume the target directory exists as per assignment simplicity or manual setup.
+
+    std::ofstream outFile(path.c_str(), std::ios::binary);
+    if (!outFile) {
+        std::cerr << "Error: Could not open file for writing at " << path << std::endl;
+        setError(response, 500, "Internal Server Error: Could not open file for writing");
+        return;
+    }
+
+    if (contentStart != body.end() && contentStart < contentEnd) {
+         outFile.write(&(*contentStart), std::distance(contentStart, contentEnd));
+    }
+    outFile.close();
+
+    response.setStatus(201, "Created");
+    std::stringstream resBody;
+    resBody << "<html><body><h1>File Uploaded Successfully</h1><p>Saved as " << filename << "</p></body></html>";
+    response.setBody(resBody.str());
+    response.setHeader("Content-Type", "text/html");
+    response.setHeader("Location", joinPaths(request.getTarget(), filename));
+}

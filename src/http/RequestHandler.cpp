@@ -12,9 +12,39 @@
 /* ************************************************************************** */
 
 #include "RequestHandler.hpp"
-#include <stdexcept>
+#include "Methods/Delete.hpp"
+#include "Methods/Get.hpp"
+#include "Methods/Post.hpp"
+
+namespace {
+bool isAdminPath(const std::string &target) {
+  return target == "/admin" || target.compare(0, 7, "/admin/") == 0;
+}
+
+std::string buildAllowHeader(const std::vector<short> &methods) {
+  static const char *names[] = {"GET", "POST", "DELETE", "PUT", "HEAD"};
+  std::string result;
+  for (size_t i = 0; i < methods.size() && i < 5; ++i) {
+    if (!methods[i])
+      continue;
+    if (!result.empty())
+      result += ", ";
+    result += names[i];
+  }
+  return result;
+}
+} // namespace
 
 RequestHandler::RequestHandler(const WebserverConfig &srv) : server(srv) {}
+
+void RequestHandler::respondMethodNotAllowed(const LocationBlock &location,
+                                             HttpResponse &response) {
+  const std::vector<short> &methods = location.getMethods();
+  std::string allow = buildAllowHeader(methods);
+  if (!allow.empty())
+    response.setHeader("Allow", allow);
+  handleError(405, "Method Not Allowed", response);
+}
 
 void RequestHandler::process(const HTTPRequest &request,
                              HttpResponse &response) {
@@ -45,11 +75,23 @@ void RequestHandler::process(const HTTPRequest &request,
   }
   const std::string method = request.getMethod();
   const std::string target = request.getTarget();
+
+  if (isAdminPath(target) && request.getHeader("Authorization").empty()) {
+    response.setHeader("WWW-Authenticate", "Basic realm=\"webserv\"");
+    handleError(401, "Unauthorized", response);
+    return;
+  }
+
   if (target.size() >= 4 && target.substr(target.size() - 4) == ".php")
     isCGI = true;
   else if (target.size() >= 3 && target.substr(target.size() - 3) == ".py")
     isCGI = true;
-  if (method == "GET") {
+  bool stripBody = false;
+  if (method == "HEAD") {
+    stripBody = true;
+  }
+
+  if (method == "GET" || method == "HEAD") {
     if (isCGI)
       handleCGI(request, response);
     else
@@ -64,6 +106,12 @@ void RequestHandler::process(const HTTPRequest &request,
   } else {
     handleError(405, "Method Not Allowed", response);
   }
+
+  if (stripBody) {
+    std::string originalLength = response.getHeader("Content-Length");
+    response.setBody("");
+    response.setHeader("Content-Length", originalLength);
+  }
 }
 
 void RequestHandler::setCommonHeaders(HttpResponse &response) {
@@ -77,182 +125,50 @@ void RequestHandler::setCommonHeaders(HttpResponse &response) {
   response.setHeader("Connection", "keep-alive");
 }
 
+void RequestHandler::handleGET(const HTTPRequest &request,
+                               HttpResponse &response) {
+  LocationBlock location;
+  location = matchLocation(request.getTarget());
+  const std::vector<short> locMethods = location.getMethods();
+
+  if (locMethods.size() < 1 || locMethods[0] == 0) {
+    respondMethodNotAllowed(location, response);
+    return;
+  }
+
+  Get::handle(request, response, location);
+}
+
+
 
 void RequestHandler::handlePOST(const HTTPRequest &request, HttpResponse &response)
 {
-
-
     LocationBlock location;
     location = matchLocation(request.getTarget());
     const std::vector<short> locMethods = location.getMethods();
     
-    if (locMethods[1] == 0)
+    if (locMethods.size() < 2 || locMethods[1] == 0)
     {
-        std::string allow;
-        response.setStatus(405, "Method Not Allowed");
-        if (locMethods[0])
-            allow += "GET, ";
-        if (locMethods[2])
-            allow += "DELETE, ";
-        if (locMethods[3])
-            allow += "PUT, ";
-        if (locMethods[4])
-            allow += "HEAD, ";
-        if (!allow.empty())
-            allow.erase(allow.size() - 2);
-        response.setHeader("Allow", allow);
-        response.setBody("<html><body><h1>Method Not Allowed</h1></body></html>");
-        response.setHeader("Content-Type", "text/html");
+        respondMethodNotAllowed(location, response);
+        return;
+    }
+    unsigned long limit = location.getMaxBodySize();
+    if (request.getBody().size() > limit)
+    {
+        handleError(413, "Payload Too Large", response);
+        return;
+    }
+    std::string ct = request.getHeader("Content-Type");
+
+    if (ct.empty())
+    {
+        response.setStatus(400, "Bad Request");
+        response.setBody("Missing Content-Type");
         return;
     }
 
-
-  POST::handle(request, response, location);
-    // unsigned long limit = location.getMaxBodySize();
-    // if (request.getBody().size() > limit)
-    // {
-    //     handleError(413, "Payload Too Large", response);
-    //     return;
-    // }
-    // std::string ct = request.getHeader("Content-Type");
-
-    // std::string ctLower = ct;
-    // for (size_t i = 0; i < ctLower.size(); i++)
-    //     ctLower[i] = tolower(ctLower[i]);
-
-    // if (ctLower.find("multipart/form-data") == std::string::npos)
-    // {
-    //     response.setStatus(415, "Unsupported Media Type");
-    //     return;
-    // }
-
-    // if (ct.empty())
-    // {
-    //     response.setStatus(400, "Bad Request");
-    //     response.setBody("Missing Content-Type");
-    //     return;
-    // }
-
-    // if (ct.find("multipart/form-data") == std::string::npos)
-    // {
-    //     response.setStatus(415, "Unsupported Media Type");
-    //     response.setBody("POST supports only multipart/form-data");
-    //     response.setHeader("Content-Type", "text/html");
-    //     return;
-    // }
-    // size_t pos = ct.find("boundary=");
-    // if (pos == std::string::npos)
-    // {
-    //     response.setStatus(400, "Bad Request");
-    //     response.setBody("Missing multipart boundary");
-    //     return;
-    // }
-
-    // const std::string boundary = "--" + ct.substr(pos + 9);
-    // if (boundary.empty())
-    // {
-    //     response.setStatus(400, "Bad Request");
-    //     response.setBody("Empty boundary");
-    //     return;
-    // }
-    // try {
-    //     MultipartParser parser(boundary, request.getBody());
-
-    //     while (parser.hasNextPart())
-    //     {
-    //         Part part = parser.nextPart();
-    //         if (part.filename.empty())
-    //         {
-    //             response.setStatus(400, "Bad Request");
-    //             return;
-    //         }
-
-    //         try
-    //         {
-    //             std::string filename = sanitizeFilename(part.filename);
-                
-    //             if (filename.empty())
-    //             {
-    //                 response.setStatus(400, "Bad Request");
-    //                 return;
-    //             }
-    //             std::string root = location.getRoot();
-    //             if (!root.empty() && root[root.size() - 1] == '/')
-    //                 root.erase(root.size() - 1);
-
-    //             std::string target = request.getTarget();
-    //             if (target.empty() || target[0] != '/')
-    //             {
-    //                 response.setStatus(400, "Bad Request");
-    //                 return;
-    //             }
-    //             if (target.find("..") != std::string::npos)
-    //             {
-    //                 response.setStatus(400, "Bad Request");
-    //                 return;
-    //             }
-
-
-    //             std::string basePath =  root + request.getTarget();
-    //             if (!basePath.empty() && basePath[basePath.size() - 1] != '/')
-    //               basePath += '/';
-    //             std::string path = basePath + filename;
-
-    //             struct stat st;
-    //             if (stat(basePath.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
-    //             {
-    //                 response.setStatus(403, "Not Found");
-    //                 return;
-    //             }
-
-    //             if (access(basePath.c_str(), W_OK) != 0)
-    //             {
-    //                 handleError(404, "Forbidden: Upload directory is not writable", response);
-    //                 return;
-    //             }
-    //             std::cout << "Path = " << path << std::endl;
-    //             int i = 1;
-    //           std::string base = filename;
-    //           while (access(path.c_str(), F_OK) == 0)
-    //           {
-    //             std::ostringstream oss;
-    //             oss << i++;
-    //             filename = oss.str() + "_" + base;
-    //             path = basePath + filename;
-    //           }
-
-
-    //             std::ofstream file(path.c_str(), std::ios::binary);
-    //             if (!file.is_open())
-    //             {
-    //                 handleError(500, "Internal Server Error", response);
-    //                 return;
-    //             }
-    //             file.write(part.data.data(), part.data.size());
-    //             file.close();
-    //         }
-    //         catch (...)
-    //         {
-    //             if (errno == EFBIG)
-    //                 response.setStatus(413, "Payload Too Large");
-    //             else
-    //                 response.setStatus(400, "Bad Request");
-    //             return;
-    //         }
-
-    //     }
-
-    //     response.setStatus(201, "Created");
-    //     response.setBody("Upload successful");
-    //   }
-    //   catch (...) {
-    //       response.setStatus(400, "Bad Request");
-    //       response.setBody("Invalid multipart body");
-    //       return;
-    //   }
-    //   return;
+    Post::handle(request, response, location);
 }
-
 
 void RequestHandler::handleCGI(const HTTPRequest &request, HttpResponse &response) {
   (void)request;
@@ -265,48 +181,11 @@ void RequestHandler::handleDELETE(const HTTPRequest &request, HttpResponse &resp
   const std::vector<short> locMethods = location.getMethods();
 
   if (locMethods.size() < 3 || locMethods[2] == 0) {
-    response.setStatus(405, "Method Not Allowed");
-    std::string allow = location.getPrintMethods();
-    if (!allow.empty())
-      response.setHeader("Allow", allow);
-    response.setBody("<html><body><h1>Method Not Allowed</h1></body></html>");
-    response.setHeader("Content-Type", "text/html");
+    respondMethodNotAllowed(location, response);
     return;
   }
 
   Delete::handle(request, response, location);
-}
-
-
-void RequestHandler::handleGET(const HTTPRequest &request,
-                               HttpResponse &response) {
-  LocationBlock location;
-  location = matchLocation(request.getTarget());
-  const std::vector<short> locMethods = location.getMethods();
-  const std::string &ret = location.getReturn();
-  if (!ret.empty()) {
-    response.setStatus(302, "Found");
-    response.setHeader("Location", ret);
-    response.setHeader("Content-Type", "text/html");
-    std::stringstream body;
-    body << "<html><body><h1>Found</h1><a href=\"" << ret << "\">" << ret << "</a></body></html>";
-    response.setBody(body.str());
-    return;
-  }
-
-  if (locMethods.size() < 1 || locMethods[0] == 0) 
-  {
-    response.setStatus(405, "Method Not Allowed");
-    std::string allow = location.getPrintMethods();
-    if (!allow.empty())
-      response.setHeader("Allow", allow);
-
-    response.setBody("<html><body><h1>Method Not Allowed</h1></body></html>");
-    response.setHeader("Content-Type", "text/html");
-    return;
-  }
-
-  Get::handle(request, response, location);
 }
 
 void RequestHandler::handleError(int errorCode, const std::string &errorMessage,
@@ -328,7 +207,6 @@ const LocationBlock &RequestHandler::matchLocation(const std::string &path) {
   const std::vector<LocationBlock> &locs = server.getLocationBlocks();
   const LocationBlock *best = NULL;
   size_t best_len = 0;
-  
   for (size_t i = 0; i < locs.size(); i++) {
     const std::string &locPath = locs[i].getPath();
 
@@ -348,32 +226,4 @@ const LocationBlock &RequestHandler::matchLocation(const std::string &path) {
   defaultLoc.setIndex(server.getIndex());
   defaultLoc.setMaxBodySize(server.getMaxBodySize());
   return (defaultLoc);
-}
-
-std::string RequestHandler::sanitizeFilename(std::string name)
-{
-    size_t p = name.find_last_of("/\\");
-    if (p != std::string::npos)
-        name = name.substr(p + 1);
-    if (name.size() > 255)
-    {
-        errno = EFBIG;
-        throw std::runtime_error("filename too long");
-    }
-
-    if (name.empty() || name == "." || name == ".." || name[0] == '.')
-        throw std::runtime_error("bad filename");
-
-    std::string clean;
-    for (size_t i = 0; i < name.size(); i++)
-    {
-        if (isalnum(name[i]) || name[i] == '.' || name[i] == '_' || name[i] == '-')
-            clean += name[i];
-    }
-    if (clean.empty())
-        throw std::runtime_error("bad filename");
-    name = clean;
-
-
-    return name;
 }

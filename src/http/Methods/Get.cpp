@@ -1,43 +1,17 @@
 #include "Get.hpp"
-#include <fstream>
-#include <dirent.h>
+#include "../../utils/Helpers.hpp"
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <dirent.h>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <vector>
 
-// Simple directory utilities for autoindexing
-static std::vector<std::string> getDirList(const std::string &path) {
-  std::vector<std::string> files;
-  DIR *dir = opendir(path.c_str());
-  if (!dir)
-    return files;
-
-  struct dirent *entry;
-  while ((entry = readdir(dir))) {
-    if (std::strcmp(entry->d_name, ".") != 0 &&
-        std::strcmp(entry->d_name, "..") != 0) {
-      files.push_back(entry->d_name);
-    }
-  }
-  closedir(dir);
-  return files;
-}
-
-static std::string generateAutoindex(const std::string &dir_path,
-                                     const std::string &url_path) 
-{
-  (void)dir_path; // not strictly needed here, but kept for future enhancements
-  std::string base = url_path;
-  if (base.empty() || base[base.size() - 1] != '/')
-    base += "/";
-
-  std::vector<std::string> items = getDirList(dir_path);
-  std::string html = "<html><body><h1>Index of " + base + "</h1><ul>";
-  for (size_t i = 0; i < items.size(); ++i) 
-  {
-    html += "<li><a href=\"" + base + items[i] + "\">" + items[i] + "</a></li>";
-  }
-  html += "</ul></body></html>";
-  return html;
-}
+namespace {
 
 std::string joinPaths(const std::string &base, const std::string &relative) {
   if (relative.empty())
@@ -52,162 +26,318 @@ std::string joinPaths(const std::string &base, const std::string &relative) {
   return base + "/" + rel;
 }
 
-std::string dirnameOf(const std::string &path) {
-  std::string::size_type slash = path.rfind('/');
-  if (slash == std::string::npos)
-    return ".";
-  if (slash == 0)
-    return "/";
-  return path.substr(0, slash);
-}
-
-
 void setHtmlError(HttpResponse &response, int code, const std::string &message,
-            const std::string &detail) {
-    response.setStatus(code, message);
-    std::stringstream body;
-    body << "<html><head><title>" << code << " " << message << "</title></head>"
-        << "<body><h1>" << code << " " << message << "</h1><p>" << detail
-        << "</p></body></html>";
-    response.setBody(body.str());
-    response.setHeader("Content-Type", "text/html");
+                  const std::string &detail = "") {
+  response.setStatus(code, message);
+  std::stringstream body;
+  body << "<html><head><title>" << code << " " << message << "</title></head>"
+       << "<body><h1>" << code << " " << message << "</h1>";
+  if (!detail.empty()) {
+    body << "<p>" << detail << "</p>";
+  }
+  body << "</body></html>";
+  response.setBody(body.str());
+  response.setHeader("Content-Type", "text/html");
 }
+
+std::string getMimeType(const std::string &path) {
+  size_t dotPos = path.rfind('.');
+  if (dotPos == std::string::npos)
+    return "application/octet-stream";
+  std::string ext = path.substr(dotPos + 1);
+  // to lower case
+  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+  if (ext == "html" || ext == "htm")
+    return "text/html";
+  if (ext == "css")
+    return "text/css";
+  if (ext == "js")
+    return "application/javascript";
+  if (ext == "jpg" || ext == "jpeg")
+    return "image/jpeg";
+  if (ext == "png")
+    return "image/png";
+  if (ext == "gif")
+    return "image/gif";
+  if (ext == "ico")
+    return "image/x-icon";
+  if (ext == "txt")
+    return "text/plain";
+  if (ext == "json")
+    return "application/json";
+  if (ext == "xml")
+    return "application/xml";
+  if (ext == "pdf")
+    return "application/pdf";
+  if (ext == "mp4")
+    return "video/mp4";
+  if (ext == "webm")
+    return "video/webm";
+  if (ext == "ogg")
+    return "video/ogg";
+  if (ext == "avi")
+    return "video/x-msvideo";
+  if (ext == "mkv")
+    return "video/x-matroska";
+
+  return "application/octet-stream";
+}
+
+std::string generateDirectoryListing(const std::string &path,
+                                     const std::string &requestTarget) {
+  DIR *dir;
+  struct dirent *ent;
+  std::stringstream ss;
+
+  ss << "<html><head><title>Index of " << requestTarget
+     << "</title></head><body>";
+  ss << "<h1>Index of " << requestTarget << "</h1><hr><pre>";
+
+  if ((dir = opendir(path.c_str())) != NULL) {
+    while ((ent = readdir(dir)) != NULL) {
+      std::string name = ent->d_name;
+      if (name == ".")
+        continue;
+
+      std::string href = name;
+      if (ent->d_type == DT_DIR) {
+        name += "/";
+        href += "/";
+      }
+
+      name = Helpers::escapeHtml(name);
+      href = Helpers::escapeHtml(href);
+
+      // Simple formatting
+      ss << "<a href=\"" << href << "\">" << name << "</a><br>";
+    }
+    closedir(dir);
+  } else {
+    return ""; // Error handled by caller
+  }
+
+  ss << "</pre><hr></body></html>";
+  return ss.str();
+}
+} // namespace
 
 void Get::handle(const HTTPRequest &request, HttpResponse &response,
-                     const LocationBlock &location)
-{
-    // // Match location
-    // location : the location of the target. 
-    const std::string target = request.getTarget();
+                 const LocationBlock &location) {
+  std::string target = request.getTarget();
 
-    // check no target
-    if (target.empty() || target[0] != '/') {
-        setHtmlError(response, 400, "Bad Request", "Invalid request target.");
-        return;
+  std::string path;
+  std::string locationPath = location.getPath();
+
+  if (!location.getAlias().empty() &&
+      target.rfind(locationPath, 0) ==
+          0) { // Check if target starts with locationPath
+    // If an alias is defined and the target matches the location path, use the
+    // alias. The target needs to have the location block's path stripped and
+    // then the alias prepended.
+    std::string relativeTarget = target.substr(locationPath.length());
+    path = joinPaths(location.getAlias(), relativeTarget);
+  } else {
+    // Otherwise, use the root as before.
+    path = joinPaths(location.getRoot(), target);
+  }
+
+  struct stat pathStat;
+  if (stat(path.c_str(), &pathStat) != 0) {
+    setHtmlError(response, 404, "Not Found",
+                 "The requested resource was not found on this server.");
+    return;
+  }
+
+  if (S_ISDIR(pathStat.st_mode)) {
+    // It's a directory
+
+    // 1. Check for index file
+    std::string indexFile = location.getIndex();
+    if (!indexFile.empty()) {
+      std::string indexPath = joinPaths(path, indexFile);
+      struct stat indexStat;
+      if (stat(indexPath.c_str(), &indexStat) == 0 &&
+          !S_ISDIR(indexStat.st_mode)) {
+        // Serve index file
+        path = indexPath;
+        // Fall through to file serving logic
+        goto serve_file;
+      }
     }
 
-    const std::string root = location.getRoot();
-    const std::string filePath = joinPaths(root, target);
-    const std::string dirPath = dirnameOf(filePath);
+    // 2. Check Autoindex
+    if (location.getAutoindex()) {
+      std::string listing = generateDirectoryListing(path, target);
+      if (listing.empty()) {
+        setHtmlError(response, 500, "Internal Server Error",
+                     "Could not list directory.");
+        return;
+      }
+      response.setStatus(200, "OK");
+      response.setBody(listing);
+      response.setHeader("Content-Type", "text/html");
+      return;
+    }
 
-    // Resolves symlinks to avoid path traversals.
-    // and store the real paths in the new variable. 
-    char rootReal[PATH_MAX];
-        if (realpath(root.c_str(), rootReal) == NULL) 
-        {
-            setHtmlError(response, 500, "Internal Server Error",
-                        "Failed to resolve server root.");
+    // 3. Forbidden
+    setHtmlError(response, 403, "Forbidden", "Directory listing is disabled.");
+    return;
+  }
+
+serve_file:
+  // It's a file
+  std::ifstream file(path.c_str(), std::ios::binary);
+  if (!file) {
+    if (access(path.c_str(), R_OK) != 0) {
+      setHtmlError(response, 403, "Forbidden", "Permission denied.");
+    } else {
+      setHtmlError(response, 500, "Internal Server Error",
+                   "Could not open file.");
+    }
+    return;
+  }
+
+  // Get file size
+  file.seekg(0, std::ios::end);
+  std::streamsize fileSize = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  if (fileSize == -1) {
+    setHtmlError(response, 500, "Internal Server Error",
+                 "Could not determine file size.");
+    return;
+  }
+
+  // Range Header Handling
+  std::string rangeHeader = request.getHeader("Range");
+  if (!rangeHeader.empty() && rangeHeader.compare(0, 6, "bytes=") == 0) {
+    std::string rangeSet = rangeHeader.substr(6);
+    size_t dashPos = rangeSet.find('-');
+
+    size_t start = 0;
+    size_t end = (size_t)fileSize - 1;
+
+    if (dashPos != std::string::npos) {
+      std::string startStr = rangeSet.substr(0, dashPos);
+      std::string endStr = rangeSet.substr(dashPos + 1);
+
+      if (startStr.empty()) {
+        // Suffix: bytes=-500
+        if (!endStr.empty()) {
+          size_t suffix;
+          std::stringstream ss(endStr);
+          ss >> suffix;
+          if (ss.fail()) {
+             setHtmlError(response, 400, "Bad Request", "Invalid Range suffix.");
+             return;
+          }
+          if (suffix < (size_t)fileSize)
+            start = (size_t)fileSize - suffix;
+          else
+            start = 0;
+        }
+      } else {
+        std::stringstream ss(startStr);
+        ss >> start;
+        if (ss.fail()) {
+            setHtmlError(response, 400, "Bad Request", "Invalid Range start.");
             return;
         }
-
-    char dirReal[PATH_MAX];
-      if (realpath(dirPath.c_str(), dirReal) == NULL) 
-      {
-          setHtmlError(response, 404, "Not Found", "Target not found.");
-      return;
-    }
-
-    // check the existance of the file 
-    struct stat fileStat;
-    if (lstat(filePath.c_str(), &fileStat) != 0) 
-    {
-      if (errno == ENOENT) 
-        setHtmlError(response, 404, "Not Found", "Target not found.");
-      else
-        setHtmlError(response, 403, "Forbidden", "Cannot access target.");
-      return;
-    }
-//-------------------------------------------------------------
-    // Handle listing :
-
-    if (S_ISDIR(fileStat.st_mode)) 
-    {
-      // Try serving an index file (location settings have priority)
-      const std::string indexName = location.getIndex();
-      std::string indexPath = joinPaths(filePath, indexName);
-      struct stat idxStat;
-      if (lstat(indexPath.c_str(), &idxStat) == 0 
-          && S_ISREG(idxStat.st_mode) 
-          && access(indexPath.c_str(), R_OK) == 0) 
-      {
-        std::ifstream idxFile(indexPath.c_str(), std::ios::binary);
-        if (idxFile.is_open()) 
-        {
-          std::string content((std::istreambuf_iterator<char>(idxFile)),
-                            std::istreambuf_iterator<char>());
-          idxFile.close();
-          response.setStatus(200, "OK");
-          response.setBody(content);
-          response.setHeader("Content-Type", "text/html");
-          return;
+        if (!endStr.empty()) {
+          std::stringstream ss2(endStr);
+          ss2 >> end;
+          if (ss2.fail()) {
+              setHtmlError(response, 400, "Bad Request", "Invalid Range end.");
+              return;
+          }
         }
       }
+    }
 
-      // If index doesn't exist, check if autoindex is enabled
-      if (location.getAutoindex()) {
-        std::string html = generateAutoindex(filePath, target);
-        response.setStatus(200, "OK");
-        response.setBody(html);
-        response.setHeader("Content-Type", "text/html");
-        return;
-      }
-
-      // Directory listing denied
-      setHtmlError(response, 403, "Forbidden", "Directory listing denied.");
+    // Validate
+    if (start >= (size_t)fileSize || start > end) {
+      response.setStatus(416, "Range Not Satisfiable");
+      std::stringstream cr;
+      cr << "bytes */" << fileSize;
+      response.setHeader("Content-Range", cr.str());
       return;
     }
 
-    if (access(filePath.c_str(), R_OK) != 0) {
-    setHtmlError(response, 403, "Forbidden", "Permission denied.");
-    return;
+    // Cap chunk size (e.g., 1MB)
+    const size_t MAX_CHUNK = 1024 * 1024;
+    if (end - start + 1 > MAX_CHUNK) {
+      end = start + MAX_CHUNK - 1;
     }
 
-    // read the content of the file and return it 
-    std::ifstream file(filePath.c_str(), std::ios::binary);// open the file in binary mode 
+    // Final bounds check
+    if (end >= (size_t)fileSize)
+      end = (size_t)fileSize - 1;
 
-    if (!file.is_open()) {
-        setHtmlError(response, 500, "Internal Server Error", "Failed to open file.");
-        return;
+    std::streamsize length = end - start + 1;
+
+    file.seekg(start);
+    std::vector<char> buf(length);
+    if (file.read(&buf[0], length)) {
+      response.setStatus(206, "Partial Content");
+      response.setBody(buf);
+
+      std::stringstream cr;
+      cr << "bytes " << start << "-" << end << "/" << fileSize;
+      response.setHeader("Content-Range", cr.str());
+
+      std::stringstream cl;
+      cl << length;
+      response.setHeader("Content-Length", cl.str());
+      response.setHeader("Content-Type", getMimeType(path));
+      return;
     }
-    // read all the data of the file till we find the EOF ( the second iterator is EOF)
-    std::string content((std::istreambuf_iterator<char>(file)),
-                        std::istreambuf_iterator<char>());
-    file.close();
+  }
 
+  // For files without Range header:
+  // Always advertise Accept-Ranges so browser knows it can request ranges
+  response.setHeader("Accept-Ranges", "bytes");
+
+  // 80/20 Optimization: For large files (>1MB), send only the first chunk
+  // This makes initial load blazingly fast for large videos!
+  // The browser will automatically request remaining chunks via Range requests
+  const size_t LARGE_FILE_THRESHOLD = 1024 * 1024; // 1MB
+  const size_t INITIAL_CHUNK_SIZE = 1024 * 1024;   // 1MB initial chunk
+
+  if ((size_t)fileSize > LARGE_FILE_THRESHOLD) {
+    // Large file: send first chunk as 206 Partial Content
+    // This makes initial video load blazingly fast!
+    file.seekg(0, std::ios::beg);
+    size_t chunkSize = std::min((size_t)fileSize, INITIAL_CHUNK_SIZE);
+    std::vector<char> buf(chunkSize);
+
+    if (file.read(&buf[0], chunkSize)) {
+      response.setStatus(206, "Partial Content");
+      response.setBody(buf);
+      response.setHeader("Content-Type", getMimeType(path));
+
+      // Content-Range: bytes 0-(chunkSize-1)/totalSize
+      std::stringstream cr;
+      cr << "bytes 0-" << (chunkSize - 1) << "/" << fileSize;
+      response.setHeader("Content-Range", cr.str());
+
+      // Content-Length is the actual chunk size being sent
+      std::stringstream cl;
+      cl << chunkSize;
+      response.setHeader("Content-Length", cl.str());
+      return;
+    }
+  }
+
+  // Small file: load entirely (original behavior)
+  file.seekg(0, std::ios::beg);
+  std::vector<char> fileBuffer(fileSize);
+  if (file.read(&fileBuffer[0], fileSize)) {
+    response.setBody(fileBuffer);
     response.setStatus(200, "OK");
-    response.setBody(content);
-    
-    // Set Content-Type based on file extension
-    std::string ext;
-    size_t dotPos = filePath.rfind('.');
-    if (dotPos != std::string::npos) {
-        ext = filePath.substr(dotPos);
-    }
-    
-    if (ext == ".html" || ext == ".htm")
-        response.setHeader("Content-Type", "text/html");
-    else if (ext == ".css")
-        response.setHeader("Content-Type", "text/css");
-    else if (ext == ".js")
-        response.setHeader("Content-Type", "application/javascript");
-    else if (ext == ".json")
-        response.setHeader("Content-Type", "application/json");
-    else if (ext == ".png")
-        response.setHeader("Content-Type", "image/png");
-    else if (ext == ".jpg" || ext == ".jpeg")
-        response.setHeader("Content-Type", "image/jpeg");
-    else if (ext == ".gif")
-        response.setHeader("Content-Type", "image/gif");
-    else if (ext == ".txt")
-        response.setHeader("Content-Type", "text/plain");
-    else
-        response.setHeader("Content-Type", "application/octet-stream");
+    response.setHeader("Content-Type", getMimeType(path));
+  } else {
+    setHtmlError(response, 500, "Internal Server Error",
+                 "Could not read file.");
+  }
 }
-
-
-
-
-// 2 - Directory + no index + autoindex off → 403 Forbidden
-
-
-// http://localhost:8080/index.esa?q=webserv&page=2&sort=asc
