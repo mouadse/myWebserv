@@ -13,32 +13,39 @@
 #ifndef HTTPRESPONSE_HPP
 #define HTTPRESPONSE_HPP
 
-#include <string>
+#include <cstring>
+#include <iostream>
 #include <map>
 #include <sstream>
 #include <stdexcept>
-#include <iostream>
+#include <string>
+#include <vector>
 
 class HttpResponse {
 
-    private:
-        int statusCode;
-        std::string statusMessage;
-        std::map<std::string, std::string> headers;
-        std::string body;
-        void setContentLength(size_t len);
-    public:
-        HttpResponse();
-        HttpResponse(int code, const std::string &message);
-        void setStatus(int code, const std::string &message);
-        void setHeader(const std::string &name, const std::string &value);
-        bool hasHeader(const std::string &name) const;
-        const std::string &getHeader(const std::string &name) const;
-        void setBody(const std::string &bodyContent);
-        const std::string &getBody() const;
-        std::string toString() const;
-        void setContentType(const std::string &type);
-        void printResponse() const;
+private:
+  int statusCode;
+  std::string statusMessage;
+  std::map<std::string, std::string> headers;
+  std::vector<char> body; // Binary-safe body storage
+  void setContentLength(size_t len);
+
+public:
+  HttpResponse();
+  HttpResponse(int code, const std::string &message);
+  void setStatus(int code, const std::string &message);
+  void setHeader(const std::string &name, const std::string &value);
+  bool hasHeader(const std::string &name) const;
+  const std::string &getHeader(const std::string &name) const;
+  void setBody(const std::string &bodyContent);
+  void setBody(const std::vector<char> &bodyContent); // Binary-safe overload
+  void setBody(const char *data, size_t len);         // Raw data overload
+  std::string getBodyAsString() const;
+  const std::vector<char> &getBody() const;
+  std::string toString() const;
+  void toBuffer(std::vector<char> &out) const; // Efficient pre-sized buffer
+  void setContentType(const std::string &type);
+  void printResponse() const;
 };
 
 #endif

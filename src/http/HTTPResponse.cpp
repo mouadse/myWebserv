@@ -12,65 +12,105 @@
 
 #include "HTTPResponse.hpp"
 
-HttpResponse::HttpResponse(){}
+HttpResponse::HttpResponse() : statusCode(200), statusMessage("OK") {}
+
 HttpResponse::HttpResponse(int code, const std::string &message)
     : statusCode(code), statusMessage(message) {}
 
 void HttpResponse::setStatus(int code, const std::string &message) {
-    statusCode = code;
-    statusMessage = message;
+  statusCode = code;
+  statusMessage = message;
 }
 
-void HttpResponse::setHeader(const std::string &name, const std::string &value) {
-    headers[name] = value;
+void HttpResponse::setHeader(const std::string &name,
+                             const std::string &value) {
+  headers[name] = value;
 }
 
 bool HttpResponse::hasHeader(const std::string &name) const {
-    return (headers.find(name) != headers.end());
+  return (headers.find(name) != headers.end());
 }
 
 const std::string &HttpResponse::getHeader(const std::string &name) const {
-    std::map<std::string, std::string>::const_iterator it = headers.find(name);
-    if (it == headers.end())
-        throw std::runtime_error("Header not found: " + name);
-    return (it->second);
+  std::map<std::string, std::string>::const_iterator it = headers.find(name);
+  if (it == headers.end())
+    throw std::runtime_error("Header not found: " + name);
+  return (it->second);
 }
 
 void HttpResponse::setBody(const std::string &bodyContent) {
-    body = bodyContent;
-    setContentLength(body.size());
+  body.assign(bodyContent.begin(), bodyContent.end());
+  setContentLength(body.size());
 }
 
-const std::string &HttpResponse::getBody() const {
-    return (body);
+void HttpResponse::setBody(const std::vector<char> &bodyContent) {
+  body = bodyContent;
+  setContentLength(body.size());
+}
+
+void HttpResponse::setBody(const char *data, size_t len) {
+  body.assign(data, data + len);
+  setContentLength(body.size());
+}
+
+std::string HttpResponse::getBodyAsString() const {
+  if (body.empty())
+    return "";
+  return std::string(&body[0], body.size());
+}
+
+const std::vector<char> &HttpResponse::getBody() const { return body; }
+
+// Efficient pre-sized buffer construction using memcpy
+void HttpResponse::toBuffer(std::vector<char> &out) const {
+  // Build status line
+  std::ostringstream statusLine;
+  statusLine << "HTTP/1.1 " << statusCode << " " << statusMessage << "\r\n";
+  std::string sl = statusLine.str();
+
+  // Build headers
+  std::string hdrs;
+  for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+       it != headers.end(); ++it) {
+    hdrs += it->first + ": " + it->second + "\r\n";
+  }
+  hdrs += "\r\n";
+
+  // Calculate total size and pre-allocate
+  size_t totalSize = sl.size() + hdrs.size() + body.size();
+  size_t oldSize = out.size();
+  out.resize(oldSize + totalSize);
+
+  // Use memcpy for efficient copying
+  char *dest = &out[oldSize];
+  std::memcpy(dest, sl.c_str(), sl.size());
+  dest += sl.size();
+  std::memcpy(dest, hdrs.c_str(), hdrs.size());
+  dest += hdrs.size();
+  if (!body.empty()) {
+    std::memcpy(dest, &body[0], body.size());
+  }
 }
 
 std::string HttpResponse::toString() const {
-    std::ostringstream ss;
-
-    ss << "HTTP/1.1 " << statusCode << " " << statusMessage << "\r\n";
-    std::map<std::string, std::string>::const_iterator it = headers.begin();
-    while (it != headers.end()) {
-        ss << it->first << ": " << it->second << "\r\n";
-        ++it;
-    }
-    ss << "\r\n";
-    ss << body;
-    return ss.str();
+  std::vector<char> buf;
+  toBuffer(buf);
+  if (buf.empty())
+    return "";
+  return std::string(&buf[0], buf.size());
 }
 
 void HttpResponse::setContentLength(size_t len) {
-    std::ostringstream ss;
-    ss << len;
-    setHeader("Content-Length", ss.str());
+  std::ostringstream ss;
+  ss << len;
+  setHeader("Content-Length", ss.str());
 }
 
-
 void HttpResponse::setContentType(const std::string &type) {
-    setHeader("Content-Type", type);
+  setHeader("Content-Type", type);
 }
 
 void HttpResponse::printResponse() const {
-    std::string responseStr = toString();
-    std::cout << responseStr << std::endl;
+  std::string responseStr = toString();
+  std::cout << responseStr << std::endl;
 }

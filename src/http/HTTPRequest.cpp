@@ -13,8 +13,8 @@
 #include "HTTPRequest.hpp"
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
 #include <cerrno>
+#include <cstdlib>
 #include <sstream>
 
 HTTPRequest::HTTPRequest()
@@ -77,17 +77,14 @@ void HTTPRequest::addData(const char *data, size_t len) {
 }
 
 bool HTTPRequest::tryParseRequestLine() {
-  size_t line_end = parse_offset;
-  bool found_crlf = false;
-  while (line_end + 1 < buffer.size()) {
-    if (buffer[line_end] == '\r' && buffer[line_end + 1] == '\n') {
-      found_crlf = true;
-      break;
-    }
-    ++line_end;
-  }
-  if (!found_crlf)
+  // Use std::search for efficient CRLF detection
+  static const char crlf[] = {'\r', '\n'};
+  std::vector<char>::iterator it =
+      std::search(buffer.begin() + parse_offset, buffer.end(), crlf, crlf + 2);
+  if (it == buffer.end())
     return false;
+
+  size_t line_end = it - buffer.begin();
   std::string line(buffer.begin() + parse_offset, buffer.begin() + line_end);
   parse_offset = line_end + 2;
   std::istringstream iss(line);
@@ -123,18 +120,14 @@ bool HTTPRequest::tryParseRequestLine() {
 }
 
 bool HTTPRequest::tryParseHeaders() {
-  size_t pos = parse_offset;
-  bool found_end = false;
-  while (pos + 3 < buffer.size()) {
-    if (buffer[pos] == '\r' && buffer[pos + 1] == '\n' &&
-        buffer[pos + 2] == '\r' && buffer[pos + 3] == '\n') {
-      found_end = true;
-      break;
-    }
-    ++pos;
-  }
-  if (!found_end)
-    return (false);
+  // Use std::search for efficient double-CRLF detection
+  static const char crlfcrlf[] = {'\r', '\n', '\r', '\n'};
+  std::vector<char>::iterator crlfIt = std::search(
+      buffer.begin() + parse_offset, buffer.end(), crlfcrlf, crlfcrlf + 4);
+  if (crlfIt == buffer.end())
+    return false;
+
+  size_t pos = crlfIt - buffer.begin();
   std::string headers_block(buffer.begin() + parse_offset,
                             buffer.begin() + pos);
   if (headers_block.size() > MAX_HEADER_SIZE) {
