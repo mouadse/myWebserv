@@ -141,6 +141,15 @@ void Get::handle(const HTTPRequest &request, HttpResponse &response,
   if (S_ISDIR(pathStat.st_mode)) {
     // It's a directory
 
+    // 0. Redirect to trailing slash if missing (NGINX behavior)
+    // This ensures relative URLs in directory listings resolve correctly
+    if (target.empty() || target[target.length() - 1] != '/') {
+      response.setStatus(301, "Moved Permanently");
+      response.setHeader("Location", target + "/");
+      response.setBody("");
+      return;
+    }
+
     // 1. Check for index file
     std::string indexFile = location.getIndex();
     if (!indexFile.empty()) {
