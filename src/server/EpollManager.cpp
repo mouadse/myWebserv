@@ -17,10 +17,12 @@ EpollManager *EpollManager::instance = 0;
 
 // private constructor :
 EpollManager::EpollManager() {
-  Logger::debug("EpollManager constructor called");
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager constructor called");
 
   epfd = epoll_create1(0);
-  Logger::debug("epoll_create1() returned FD: " + Helpers::toString(epfd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("epoll_create1() returned FD: " + Helpers::toString(epfd));
 
   if (epfd < 0) {
     Logger::error("epoll_create1() failed: " + std::string(strerror(errno)));
@@ -43,27 +45,32 @@ EpollManager &EpollManager::operator=(const EpollManager &other) {
 }
 
 EpollManager::~EpollManager() {
-  Logger::debug("EpollManager destructor called");
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager destructor called");
 
   if (epfd >= 0) {
-    Logger::debug("Closing epoll FD: " + Helpers::toString(epfd));
+    if (Logger::isDebugEnabled())
+      Logger::debug("Closing epoll FD: " + Helpers::toString(epfd));
     close(epfd);
     Logger::info("Epoll FD closed: " + Helpers::toString(epfd));
   } else {
-    Logger::debug("Epoll FD already closed or invalid: " +
-                  Helpers::toString(epfd));
+    if (Logger::isDebugEnabled())
+      Logger::debug("Epoll FD already closed or invalid: " +
+                    Helpers::toString(epfd));
   }
 }
 
 // get single instance
 EpollManager &EpollManager::getInstance() {
-  Logger::debug("EpollManager::getInstance() called");
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::getInstance() called");
 
   if (instance == 0) {
     Logger::info("Creating new EpollManager instance");
     instance = new EpollManager();
   } else {
-    Logger::debug("Returning existing EpollManager instance");
+    if (Logger::isDebugEnabled())
+      Logger::debug("Returning existing EpollManager instance");
   }
 
   return *instance;
@@ -71,13 +78,15 @@ EpollManager &EpollManager::getInstance() {
 
 // in case i want to clean up the instance :
 void EpollManager::destroyInstance() {
-  Logger::debug("EpollManager::destroyInstance() called");
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::destroyInstance() called");
 
   if (instance != 0) {
     Logger::info("Destroying EpollManager instance");
     delete instance;
     instance = 0;
-    Logger::debug("EpollManager instance set to NULL");
+    if (Logger::isDebugEnabled())
+      Logger::debug("EpollManager instance set to NULL");
   } else {
     Logger::warn("destroyInstance() called but instance is already NULL");
   }
@@ -86,8 +95,9 @@ void EpollManager::destroyInstance() {
 // Crud functions :
 
 void EpollManager::add(int fd, uint32_t events) {
-  Logger::debug("EpollManager::add() called - FD: " + Helpers::toString(fd) +
-                ", events: " + Helpers::toString(events));
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::add() called - FD: " + Helpers::toString(fd) +
+                  ", events: " + Helpers::toString(events));
 
   if ((epfd < 0) || (fd < 0)) {
     Logger::error("Invalid FD in add() - epfd: " + Helpers::toString(epfd) +
@@ -127,8 +137,9 @@ void EpollManager::add(int fd, uint32_t events) {
 }
 
 void EpollManager::mod(int fd, uint32_t events) {
-  Logger::debug("EpollManager::mod() called - FD: " + Helpers::toString(fd) +
-                ", events: " + Helpers::toString(events));
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::mod() called - FD: " + Helpers::toString(fd) +
+                  ", events: " + Helpers::toString(events));
 
   if ((epfd < 0) || (fd < 0)) {
     Logger::error("Invalid FD in mod() - epfd: " + Helpers::toString(epfd) +
@@ -168,7 +179,9 @@ void EpollManager::mod(int fd, uint32_t events) {
 }
 
 void EpollManager::remove(int fd) {
-  Logger::debug("EpollManager::remove() called - FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::remove() called - FD: " +
+                  Helpers::toString(fd));
 
   if ((epfd < 0) || (fd < 0)) {
     Logger::error("Invalid FD in remove() - epfd: " + Helpers::toString(epfd) +
@@ -191,8 +204,9 @@ void EpollManager::remove(int fd) {
 }
 
 int EpollManager::wait(epoll_event *events, int maxEvents) {
-  Logger::debug("EpollManager::wait() called - maxEvents: " +
-                Helpers::toString(maxEvents));
+  if (Logger::isDebugEnabled())
+    Logger::debug("EpollManager::wait() called - maxEvents: " +
+                  Helpers::toString(maxEvents));
 
   if (epfd < 0) {
     Logger::error("Epoll FD invalid in wait(): " + Helpers::toString(epfd));
@@ -200,14 +214,15 @@ int EpollManager::wait(epoll_event *events, int maxEvents) {
   }
 
   int ready = epoll_wait(epfd, events, maxEvents, -1);
-  Logger::debug("epoll_wait() returned " + Helpers::toString(ready) +
-                " ready events");
+  if (Logger::isDebugEnabled())
+    Logger::debug("epoll_wait() returned " + Helpers::toString(ready) +
+                  " ready events");
 
   if (ready < 0) {
     return ready;
   }
 
-  if (ready > 0) {
+  if (ready > 0 && Logger::isDebugEnabled()) {
     Logger::debug("Processing " + Helpers::toString(ready) + " epoll events");
 
     // Log each ready event in debug mode

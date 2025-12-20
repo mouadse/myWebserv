@@ -141,8 +141,9 @@ Server::Server(const WebserverConfig &cfg)
 }
 
 void Server::acceptClient() {
-  Logger::debug("acceptClient() called on server FD: " +
-                Helpers::toString(server_fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("acceptClient() called on server FD: " +
+                  Helpers::toString(server_fd));
 
   // Multi-accept loop: drain all pending connections in one epoll wakeup
   while (true) {
@@ -159,8 +160,9 @@ void Server::acceptClient() {
       Logger::error("accept() failed: " + std::string(strerror(errno)));
       break;
     }
-    Logger::debug("accept() returned client FD: " +
-                  Helpers::toString(client_fd));
+    if (Logger::isDebugEnabled())
+      Logger::debug("accept() returned client FD: " +
+                    Helpers::toString(client_fd));
 
     // Make non-blocking
     if (fcntl(client_fd, F_SETFL, O_NONBLOCK) < 0) {
@@ -172,9 +174,12 @@ void Server::acceptClient() {
 
     // Enable TCP_NODELAY on client socket
     int yes = 1;
-    if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) < 0)
-      Logger::debug("TCP_NODELAY failed for client FD: " +
-                    Helpers::toString(client_fd));
+    if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) <
+        0) {
+      if (Logger::isDebugEnabled())
+        Logger::debug("TCP_NODELAY failed for client FD: " +
+                      Helpers::toString(client_fd));
+    }
 
     clients[client_fd] = new Client(client_fd);
 
@@ -187,8 +192,9 @@ void Server::acceptClient() {
                  Helpers::toString(ntohs(clientAddr.sin_port)) +
                  " (FD: " + Helpers::toString(client_fd) + ")");
   }
-  Logger::debug("Total clients connected: " +
-                Helpers::toString(clients.size()));
+  if (Logger::isDebugEnabled())
+    Logger::debug("Total clients connected: " +
+                  Helpers::toString(clients.size()));
 }
 
 void Server::readClient(int fd) {
@@ -207,12 +213,14 @@ void Server::readClient(int fd) {
 
     if (n > 0) {
       c->request.addData(buf, n); // Zero-copy overload
-      Logger::debug("Added " + Helpers::toString(n) +
-                    " bytes to request buffer");
+      if (Logger::isDebugEnabled())
+        Logger::debug("Added " + Helpers::toString(n) +
+                      " bytes to request buffer");
 
       // Pipelining loop: process all complete requests
       while (c->request.isComplete() && !c->request.hasError()) {
-        Logger::debug("Request complete on FD: " + Helpers::toString(fd));
+        if (Logger::isDebugEnabled())
+          Logger::debug("Request complete on FD: " + Helpers::toString(fd));
 
         // Process this request
         RequestHandler handler(config);
@@ -264,13 +272,15 @@ void Server::readClient(int fd) {
   // If we have data to write, switch to EPOLLOUT
   if (c->wantWrite && !c->writeBuffer.empty()) {
     EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-    Logger::debug("Modified FD: " + Helpers::toString(fd) +
-                  " to EPOLLOUT for writing");
+    if (Logger::isDebugEnabled())
+      Logger::debug("Modified FD: " + Helpers::toString(fd) +
+                    " to EPOLLOUT for writing");
   }
 }
 
 void Server::writeClient(int fd) {
-  Logger::debug("writeClient() called for FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("writeClient() called for FD: " + Helpers::toString(fd));
 
   std::map<int, Client *>::iterator it = clients.find(fd);
   if (it == clients.end() || it->second == NULL) {
@@ -283,12 +293,13 @@ void Server::writeClient(int fd) {
 
   // Drain write buffer until EAGAIN (edge-triggered requires full drain)
   while (c->writeOffset < total) {
-    ssize_t n = write(fd, &c->writeBuffer[0] + c->writeOffset,
-                      total - c->writeOffset);
+    ssize_t n =
+        write(fd, &c->writeBuffer[0] + c->writeOffset, total - c->writeOffset);
     if (n > 0) {
       c->writeOffset += n;
-      Logger::debug("write() sent " + Helpers::toString(n) +
-                    " bytes on FD: " + Helpers::toString(fd));
+      if (Logger::isDebugEnabled())
+        Logger::debug("write() sent " + Helpers::toString(n) +
+                      " bytes on FD: " + Helpers::toString(fd));
     } else if (n == 0) {
       Logger::warn("write() returned 0 on FD: " + Helpers::toString(fd) +
                    ", closing connection");
@@ -322,32 +333,37 @@ void Server::writeClient(int fd) {
   } else {
     // Still have data, keep EPOLLOUT
     EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
-    Logger::debug("Partial write, " +
-                  Helpers::toString(total - c->writeOffset) +
-                  " bytes remaining");
+    if (Logger::isDebugEnabled())
+      Logger::debug("Partial write, " +
+                    Helpers::toString(total - c->writeOffset) +
+                    " bytes remaining");
   }
 }
 
 void Server::closeClient(int fd) {
-  Logger::debug("closeClient() called for FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("closeClient() called for FD: " + Helpers::toString(fd));
 
   try {
     EpollManager::getInstance().remove(fd);
-    Logger::debug("FD: " + Helpers::toString(fd) + " removed from epoll");
+    if (Logger::isDebugEnabled())
+      Logger::debug("FD: " + Helpers::toString(fd) + " removed from epoll");
   } catch (const std::exception &e) {
     Logger::warn("Failed to remove FD from epoll during closeClient(): " +
                  Helpers::toString(fd) + " (" + e.what() + ")");
   }
 
   close(fd);
-  Logger::debug("close() called on FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("close() called on FD: " + Helpers::toString(fd));
 
   if (clients.count(fd)) {
     delete clients[fd];
     clients.erase(fd);
     Logger::info("Client FD: " + Helpers::toString(fd) +
                  " closed and cleaned up");
-    Logger::debug("Remaining clients: " + Helpers::toString(clients.size()));
+    if (Logger::isDebugEnabled())
+      Logger::debug("Remaining clients: " + Helpers::toString(clients.size()));
   } else {
     Logger::warn("closeClient() called for non-existent FD: " +
                  Helpers::toString(fd));
@@ -356,7 +372,8 @@ void Server::closeClient(int fd) {
 
 bool Server::hasClient(int fd) const {
   bool exists = clients.find(fd) != clients.end();
-  Logger::debug("hasClient(FD: " + Helpers::toString(fd) +
-                ") returns: " + (exists ? "true" : "false"));
+  if (Logger::isDebugEnabled())
+    Logger::debug("hasClient(FD: " + Helpers::toString(fd) +
+                  ") returns: " + (exists ? "true" : "false"));
   return exists;
 }

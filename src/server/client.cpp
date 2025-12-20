@@ -13,7 +13,8 @@
 #include "client.hpp"
 
 Client::Client(int fd) {
-  Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
 
   // 1. Validate FD
   if (fd < 0) {
@@ -22,13 +23,15 @@ Client::Client(int fd) {
   }
 
   this->fd = fd;
-  Logger::debug("Client FD set to: " + Helpers::toString(this->fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("Client FD set to: " + Helpers::toString(this->fd));
 
   // 2. Initialize state safely
   this->wantWrite = false;
   this->writeOffset = 0;
   this->closeAfterWrite = false;
-  Logger::debug("Client state initialized");
+  if (Logger::isDebugEnabled())
+    Logger::debug("Client state initialized");
 
   // this->writeBuffer.clear();
 

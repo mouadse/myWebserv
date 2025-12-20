@@ -46,6 +46,9 @@ public:
     void disableDebugMode();
     bool isDebugMode() const;
     
+    // Static debug check for call-site guards (avoids string construction when disabled)
+    static bool isDebugEnabled();
+    
     // Logging methods - MAKE THEM STATIC!
     static void debug(const std::string& message);
     static void info(const std::string& message);
