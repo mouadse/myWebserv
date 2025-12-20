@@ -40,7 +40,8 @@ SRCS = src/main.cpp \
        src/utils/Helpers.cpp \
 			 src/utils/SignalHandling.cpp \
        src/utils/FileCache.cpp \
-       src/utils/Logger.cpp
+       src/utils/Logger.cpp \
+       src/utils/PathUtils.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)

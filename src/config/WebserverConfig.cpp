@@ -1,4 +1,5 @@
 #include "WebserverConfig.hpp"
+#include "../utils/PathUtils.hpp"
 
 #include <cerrno>
 #include <stdexcept>
@@ -10,19 +11,6 @@ std::string normalizeDirective(std::string value, const std::string &context) {
   enforceTrailingSemicolon(value, context);
   value = trimWhitespace(value);
   return value;
-}
-
-std::string joinPaths(const std::string &base, const std::string &relative) {
-  if (relative.empty())
-    return base;
-  std::string rel = relative;
-  if (!rel.empty() && rel[0] == '/')
-    rel.erase(0, 1);
-  if (base.empty())
-    return rel;
-  if (base[base.size() - 1] == '/')
-    return base + rel;
-  return base + "/" + rel;
 }
 } // namespace
 
@@ -294,7 +282,8 @@ void WebserverConfig::setLocationBlocks(
     }
   }
 
-  if (new_location.getPath() != "/cgi-bin" && new_location.getIndex().empty() && !new_location.getAutoindex())
+  if (new_location.getPath() != "/cgi-bin" && new_location.getIndex().empty() &&
+      !new_location.getAutoindex())
     new_location.setIndex(_index);
   if (!has_max_size)
     new_location.setMaxBodySize(_max_body_size);

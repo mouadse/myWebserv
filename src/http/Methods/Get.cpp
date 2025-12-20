@@ -1,6 +1,7 @@
 #include "Get.hpp"
 #include "../../utils/FileCache.hpp"
 #include "../../utils/Helpers.hpp"
+#include "../../utils/PathUtils.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -13,19 +14,6 @@
 #include <vector>
 
 namespace {
-
-std::string joinPaths(const std::string &base, const std::string &relative) {
-  if (relative.empty())
-    return base;
-  std::string rel = relative;
-  if (!rel.empty() && rel[0] == '/')
-    rel.erase(0, 1);
-  if (base.empty())
-    return rel;
-  if (base[base.size() - 1] == '/')
-    return base + rel;
-  return base + "/" + rel;
-}
 
 void setHtmlError(HttpResponse &response, int code, const std::string &message,
                   const std::string &detail = "") {
