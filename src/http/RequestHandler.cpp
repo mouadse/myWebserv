@@ -91,6 +91,14 @@ void RequestHandler::process(const HTTPRequest &request,
     return;
   }
 
+  const std::string &redirectTarget = location.getReturn();
+  if (!redirectTarget.empty()) {
+    response.setStatus(302, "Found");
+    response.setHeader("Location", redirectTarget);
+    response.setBody("");
+    return;
+  }
+
   bool stripBody = false;
   if (method == "HEAD") {
     stripBody = true;
