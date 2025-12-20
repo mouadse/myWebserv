@@ -253,12 +253,6 @@ serve_file:
       return;
     }
 
-    // Cap chunk size (e.g., 1MB)
-    const size_t MAX_CHUNK = 1024 * 1024;
-    if (end - start + 1 > MAX_CHUNK) {
-      end = start + MAX_CHUNK - 1;
-    }
-
     // Final bounds check
     if (end >= (size_t)fileSize)
       end = (size_t)fileSize - 1;
@@ -274,6 +268,7 @@ serve_file:
       std::stringstream cr;
       cr << "bytes " << start << "-" << end << "/" << fileSize;
       response.setHeader("Content-Range", cr.str());
+      response.setHeader("Accept-Ranges", "bytes");
 
       std::stringstream cl;
       cl << length;
@@ -286,37 +281,6 @@ serve_file:
   // For files without Range header:
   // Always advertise Accept-Ranges so browser knows it can request ranges
   response.setHeader("Accept-Ranges", "bytes");
-
-  // 80/20 Optimization: For large files (>1MB), send only the first chunk
-  // This makes initial load blazingly fast for large videos!
-  // The browser will automatically request remaining chunks via Range requests
-  const size_t LARGE_FILE_THRESHOLD = 1024 * 1024; // 1MB
-  const size_t INITIAL_CHUNK_SIZE = 1024 * 1024;   // 1MB initial chunk
-
-  if ((size_t)fileSize > LARGE_FILE_THRESHOLD) {
-    // Large file: send first chunk as 206 Partial Content
-    // This makes initial video load blazingly fast!
-    file.seekg(0, std::ios::beg);
-    size_t chunkSize = std::min((size_t)fileSize, INITIAL_CHUNK_SIZE);
-    std::vector<char> buf(chunkSize);
-
-    if (file.read(&buf[0], chunkSize)) {
-      response.setStatus(206, "Partial Content");
-      response.setBody(buf);
-      response.setHeader("Content-Type", getMimeType(path));
-
-      // Content-Range: bytes 0-(chunkSize-1)/totalSize
-      std::stringstream cr;
-      cr << "bytes 0-" << (chunkSize - 1) << "/" << fileSize;
-      response.setHeader("Content-Range", cr.str());
-
-      // Content-Length is the actual chunk size being sent
-      std::stringstream cl;
-      cl << chunkSize;
-      response.setHeader("Content-Length", cl.str());
-      return;
-    }
-  }
 
   // Small file: try cache first, then read from disk
   // Cache is used for small files (<=1MB) to avoid repeated disk I/O
