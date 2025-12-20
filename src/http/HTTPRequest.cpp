@@ -307,6 +307,8 @@ bool HTTPRequest::parseChunkEnding() {
 }
 
 void HTTPRequest::parseQueryParams() {
+  query_params.clear();
+  query_string.clear();
   std::string::size_type qpos = target.find('?');
   if (qpos == std::string::npos)
     return;
@@ -348,6 +350,7 @@ void HTTPRequest::reset() {
   version.clear();
   headers.clear();
   query_params.clear();
+  query_string.clear();
   body.clear();
   state = START_LINE;
   body_state = NONE;
@@ -400,6 +403,8 @@ std::string HTTPRequest::getQueryParam_ByName(const std::string &key) const {
     return it->second;
   return "";
 }
+
+std::string HTTPRequest::getQueryString() const { return query_string; }
 
 std::map<std::string, std::string> HTTPRequest::getQueryParams() const {
   return query_params;

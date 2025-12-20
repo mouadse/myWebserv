@@ -12,10 +12,22 @@
 /* ************************************************************************** */
 
 #include "RequestHandler.hpp"
+#include "../cgi/CgiHandler.hpp"
 #include "Methods/Delete.hpp"
 #include "Methods/Get.hpp"
 #include "Methods/Post.hpp"
-
+#include "../utils/PathUtils.hpp"
+namespace {
+std::string getExtension(const std::string &path) {
+  std::string::size_type slash = path.find_last_of('/');
+  std::string::size_type dot = path.find_last_of('.');
+  if (dot == std::string::npos)
+    return "";
+  if (slash != std::string::npos && dot < slash)
+    return "";
+  return path.substr(dot);
+}
+} // namespace
 namespace {
 bool isAdminPath(const std::string &target) {
   return target == "/admin" || target.compare(0, 7, "/admin/") == 0;
@@ -53,7 +65,10 @@ void RequestHandler::process(const HTTPRequest &request,
   // from previous requests that could lead to incorrect responses.
   response = HttpResponse();
   response.setBody("");
-  bool isCGI = false;
+  const std::string method = request.getMethod();
+  const std::string target = request.getTarget();
+  const LocationBlock &location = matchLocation(target);
+  bool isCGI = !location.getExtensionToCgiMap().empty();
   setCommonHeaders(response);
   if (request.hasError()) {
     const std::string &msg = request.getErrorMessage();
@@ -73,8 +88,6 @@ void RequestHandler::process(const HTTPRequest &request,
     handleError(code, msg, response);
     return;
   }
-  const std::string method = request.getMethod();
-  const std::string target = request.getTarget();
 
   if (isAdminPath(target) && request.getHeader("Authorization").empty()) {
     response.setHeader("WWW-Authenticate", "Basic realm=\"webserv\"");
@@ -82,10 +95,6 @@ void RequestHandler::process(const HTTPRequest &request,
     return;
   }
 
-  if (target.size() >= 4 && target.substr(target.size() - 4) == ".php")
-    isCGI = true;
-  else if (target.size() >= 3 && target.substr(target.size() - 3) == ".py")
-    isCGI = true;
   bool stripBody = false;
   if (method == "HEAD") {
     stripBody = true;
@@ -139,43 +148,87 @@ void RequestHandler::handleGET(const HTTPRequest &request,
   Get::handle(request, response, location);
 }
 
+void RequestHandler::handlePOST(const HTTPRequest &request,
+                                HttpResponse &response) {
+  LocationBlock location;
+  location = matchLocation(request.getTarget());
+  const std::vector<short> locMethods = location.getMethods();
 
+  if (locMethods.size() < 2 || locMethods[1] == 0) {
+    respondMethodNotAllowed(location, response);
+    return;
+  }
+  unsigned long limit = location.getMaxBodySize();
+  if (request.getBody().size() > limit) {
+    handleError(413, "Payload Too Large", response);
+    return;
+  }
+  std::string ct = request.getHeader("Content-Type");
 
-void RequestHandler::handlePOST(const HTTPRequest &request, HttpResponse &response)
-{
-    LocationBlock location;
-    location = matchLocation(request.getTarget());
-    const std::vector<short> locMethods = location.getMethods();
-    
-    if (locMethods.size() < 2 || locMethods[1] == 0)
-    {
-        respondMethodNotAllowed(location, response);
-        return;
-    }
-    unsigned long limit = location.getMaxBodySize();
-    if (request.getBody().size() > limit)
-    {
-        handleError(413, "Payload Too Large", response);
-        return;
-    }
-    std::string ct = request.getHeader("Content-Type");
+  if (ct.empty()) {
+    response.setStatus(400, "Bad Request");
+    response.setBody("Missing Content-Type");
+    return;
+  }
 
-    if (ct.empty())
-    {
-        response.setStatus(400, "Bad Request");
-        response.setBody("Missing Content-Type");
-        return;
-    }
-
-    Post::handle(request, response, location);
+  Post::handle(request, response, location);
 }
 
-void RequestHandler::handleCGI(const HTTPRequest &request, HttpResponse &response) {
-  (void)request;
-  (void)response;
+void RequestHandler::handleCGI(const HTTPRequest &request,
+                               HttpResponse &response) {
+  const LocationBlock &location = matchLocation(request.getTarget());
+  const std::map<std::string, std::string> &cgiMap =
+      location.getExtensionToCgiMap();
+  if (cgiMap.empty()) {
+    handleError(404, "Not Found", response);
+    return;
+  }
+
+  std::string scriptUri = request.getTarget();
+  if (scriptUri == location.getPath() ||
+      (!scriptUri.empty() && scriptUri[scriptUri.size() - 1] == '/')) {
+    if (location.getIndex().empty()) {
+      handleError(404, "Not Found", response);
+      return;
+    }
+    scriptUri = joinPaths(location.getPath(), location.getIndex());
+  }
+
+  const std::string ext = getExtension(scriptUri);
+  std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
+  if (ext.empty() || it == cgiMap.end()) {
+    handleError(404, "Not Found", response);
+    return;
+  }
+
+  const std::string scriptPath = joinPaths(location.getRoot(), scriptUri);
+  struct stat st;
+  if (stat(scriptPath.c_str(), &st) != 0) {
+    if (errno == ENOENT)
+      handleError(404, "Not Found", response);
+    else
+      handleError(403, "Forbidden", response);
+    return;
+  }
+  if (S_ISDIR(st.st_mode)) {
+    handleError(404, "Not Found", response);
+    return;
+  }
+  if (access(scriptPath.c_str(), R_OK) != 0) {
+    handleError(403, "Forbidden", response);
+    return;
+  }
+  if (!it->second.empty() && access(it->second.c_str(), X_OK) != 0) {
+    handleError(500, "Internal Server Error", response);
+    return;
+  }
+
+  CgiHandler cgi(request, scriptPath, scriptUri, it->second);
+  cgi.execute(response);
 }
 
-void RequestHandler::handleDELETE(const HTTPRequest &request, HttpResponse &response) {
+void RequestHandler::handleDELETE(const HTTPRequest &request,
+                                  HttpResponse &response) {
   LocationBlock location;
   location = matchLocation(request.getTarget());
   const std::vector<short> locMethods = location.getMethods();

@@ -39,6 +39,7 @@ private:
   std::map<std::string, std::string> headers;
   std::vector<char> body;
   std::map<std::string, std::string> query_params;
+  std::string query_string;
   std::string error_message;
   bool is_chunked;
   size_t content_length;
@@ -68,6 +69,7 @@ public:
   std::string getHeader(const std::string &key) const;
   std::string getBodyAsString() const;
   std::vector<char> getBody() const;
+  std::string getQueryString() const;
   std::string getQueryParam_ByName(const std::string &key) const;
   std::map<std::string, std::string> getQueryParams() const;
   const std::string &getErrorMessage() const;
