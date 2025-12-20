@@ -250,13 +250,17 @@ void WebserverConfig::setLocationBlocks(
           std::string value = parameters[i];
           value = normalizeDirective(value, "cgi_path");
           if (value.find("/python") == std::string::npos &&
-              value.find("/bash") == std::string::npos)
+              value.find("/bash") == std::string::npos &&
+              value.find("/perl") == std::string::npos &&
+              value.find("/ruby") == std::string::npos)
             throw std::runtime_error("cgi_path is invalid");
           paths_list.push_back(value);
           break;
         } else {
           if (parameters[i].find("/python") == std::string::npos &&
-              parameters[i].find("/bash") == std::string::npos)
+              parameters[i].find("/bash") == std::string::npos &&
+              parameters[i].find("/perl") == std::string::npos &&
+              parameters[i].find("/ruby") == std::string::npos)
             throw std::runtime_error("cgi_path is invalid");
           paths_list.push_back(parameters[i]);
           if (i + 1 >= parameters.size())
@@ -355,23 +359,12 @@ int WebserverConfig::isValidLocationBlock(LocationBlock &location_block) const {
         return 1;
     }
     location_block._extension_to_cgi.clear();
-    for (std::vector<std::string>::const_iterator it =
-             location_block.getCgiExtensions().begin();
-         it != location_block.getCgiExtensions().end(); ++it) {
-      const std::string &ext = *it;
-      if (ext != ".py" && ext != "*.py" && ext != ".sh" && ext != "*.sh")
-        return 1;
-      for (std::vector<std::string>::const_iterator path_it =
-               location_block.getCgiPaths().begin();
-           path_it != location_block.getCgiPaths().end(); ++path_it) {
-        if ((ext == ".py" || ext == "*.py") &&
-            path_it->find("python") != std::string::npos)
-          location_block._extension_to_cgi.insert(
-              std::make_pair(".py", *path_it));
-        else if ((ext == ".sh" || ext == "*.sh") &&
-                 path_it->find("bash") != std::string::npos)
-          location_block._extension_to_cgi[".sh"] = *path_it;
+    for (size_t i = 0; i < location_block.getCgiExtensions().size(); ++i) {
+      std::string ext = location_block.getCgiExtensions()[i];
+      if (ext.length() > 1 && ext[0] == '*' && ext[1] == '.') {
+        ext = ext.substr(1);
       }
+      location_block._extension_to_cgi[ext] = location_block.getCgiPaths()[i];
     }
     if (location_block.getCgiPaths().size() !=
         location_block.getExtensionToCgiMap().size())
