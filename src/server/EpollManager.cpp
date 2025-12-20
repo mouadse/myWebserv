@@ -6,16 +6,14 @@
 /*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/29 13:38:03 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/17 21:58:51 by msennane         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:49:28 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "EpollManager.hpp"
 
-// Initialize the static member :
 EpollManager *EpollManager::instance = 0;
 
-// private constructor :
 EpollManager::EpollManager() {
   if (Logger::isDebugEnabled())
     Logger::debug("EpollManager constructor called");
@@ -60,7 +58,6 @@ EpollManager::~EpollManager() {
   }
 }
 
-// get single instance
 EpollManager &EpollManager::getInstance() {
   if (Logger::isDebugEnabled())
     Logger::debug("EpollManager::getInstance() called");
@@ -76,7 +73,6 @@ EpollManager &EpollManager::getInstance() {
   return *instance;
 }
 
-// in case i want to clean up the instance :
 void EpollManager::destroyInstance() {
   if (Logger::isDebugEnabled())
     Logger::debug("EpollManager::destroyInstance() called");
@@ -91,8 +87,6 @@ void EpollManager::destroyInstance() {
     Logger::warn("destroyInstance() called but instance is already NULL");
   }
 }
-
-// Crud functions :
 
 void EpollManager::add(int fd, uint32_t events) {
   if (Logger::isDebugEnabled())
@@ -228,7 +222,6 @@ int EpollManager::wait(epoll_event *events, int maxEvents) {
   if (ready > 0 && Logger::isDebugEnabled()) {
     Logger::debug("Processing " + Helpers::toString(ready) + " epoll events");
 
-    // Log each ready event in debug mode
     for (int i = 0; i < ready; i++) {
       std::string eventStr;
       if (events[i].events & EPOLLIN)

@@ -49,23 +49,18 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
                   const LocationBlock &location) {
   std::string contentType = request.getHeader("Content-Type");
 
-  // Support raw binary POST if Content-Type is NOT multipart
   if (contentType.find("multipart/form-data") == std::string::npos) {
-    // Use the same path resolution logic as Get::handle
     std::string target = request.getTarget();
     std::string path;
     std::string locationPath = location.getPath();
 
     if (!location.getAlias().empty() && target.rfind(locationPath, 0) == 0) {
-      // If alias is defined and target starts with locationPath, use alias
       std::string relativeTarget = target.substr(locationPath.length());
       path = joinPaths(location.getAlias(), relativeTarget);
     } else {
-      // Otherwise use root
       path = joinPaths(location.getRoot(), target);
     }
 
-    // Check if path is a directory or ends with '/' - reject with 400
     struct stat pathStat;
     bool pathExists = (stat(path.c_str(), &pathStat) == 0);
 
@@ -82,7 +77,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
       return;
     }
 
-    // Write raw request body to target path
     const std::vector<char> &body = request.getBody();
     std::ofstream outFile(path.c_str(), std::ios::binary);
     if (!outFile) {
@@ -120,7 +114,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
     boundaryParam = boundaryParam.substr(0, semiPos);
   }
 
-  // Trim whitespace
   size_t first = boundaryParam.find_first_not_of(" \t");
   if (first == std::string::npos) {
     setError(response, 400, "Bad Request: Empty boundary");
@@ -129,7 +122,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
   size_t last = boundaryParam.find_last_not_of(" \t");
   boundaryParam = boundaryParam.substr(first, (last - first + 1));
 
-  // Remove surrounding quotes if present
   if (boundaryParam.size() >= 2 && boundaryParam[0] == '"' &&
       boundaryParam[boundaryParam.size() - 1] == '"') {
     boundaryParam = boundaryParam.substr(1, boundaryParam.size() - 2);
@@ -138,7 +130,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
   std::string boundary = "--" + boundaryParam;
   const std::vector<char> &body = request.getBody();
 
-  // Find first boundary
   std::vector<char>::const_iterator it =
       std::search(body.begin(), body.end(), boundary.begin(), boundary.end());
   if (it == body.end()) {
@@ -146,8 +137,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
     return;
   }
 
-  // Move past the first boundary + CRLF (assuming \r\n)
-  // Note: The boundary might be followed by \r\n
   if (std::distance(it, body.end()) < static_cast<long>(boundary.size())) {
     setError(response, 400, "Bad Request: Malformed body");
     return;
@@ -158,7 +147,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
   if (it != body.end() && *it == '\n')
     it++;
 
-  // Find headers end (\r\n\r\n)
   const char *crlf2 = "\r\n\r\n";
   std::vector<char>::const_iterator headerEnd =
       std::search(it, body.end(), crlf2, crlf2 + 4);
@@ -167,7 +155,6 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
     return;
   }
 
-  // Parse headers to find filename
   std::string headers(it, headerEnd);
   size_t filenamePos = headers.find("filename=\"");
   if (filenamePos == std::string::npos) {
@@ -189,14 +176,11 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
     return;
   }
 
-  // Content starts after \r\n\r\n
   std::vector<char>::const_iterator contentStart = headerEnd + 4;
 
-  // Find next boundary
   std::vector<char>::const_iterator contentEnd =
       std::search(contentStart, body.end(), boundary.begin(), boundary.end());
 
-  // Check if there is a CRLF before the boundary
   if (contentEnd != body.begin()) {
     std::vector<char>::const_iterator temp = contentEnd;
     temp--;
@@ -219,24 +203,15 @@ void Post::handle(const HTTPRequest &request, HttpResponse &response,
   std::string locationPath = location.getPath();
 
   if (!location.getAlias().empty() &&
-      request.getTarget().rfind(locationPath, 0) ==
-          0) { // Check if target starts with locationPath
-    // If an alias is defined and the target matches the location path, use the
-    // alias. The target needs to have the location block's path stripped and
-    // then the alias prepended.
+      request.getTarget().rfind(locationPath, 0) == 0) {
     std::string relativeTarget =
         request.getTarget().substr(locationPath.length());
     uploadPath = joinPaths(location.getAlias(), relativeTarget);
   } else {
-    // Otherwise, use the root as before.
     uploadPath = joinPaths(location.getRoot(), request.getTarget());
   }
 
   std::string path = joinPaths(uploadPath, filename);
-
-  // Ensure the directory exists or at least matches the location root/target
-  // Here we assume the target directory exists as per assignment simplicity or
-  // manual setup.
 
   std::ofstream outFile(path.c_str(), std::ios::binary);
   if (!outFile) {

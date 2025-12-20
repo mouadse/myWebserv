@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Helpers.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ebelkadi <ebelkadi@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/08 01:49:08 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/08 03:08:16 by ebelkadi         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:58:42 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,7 @@
 #include <vector>
 #include "../server/server.hpp"
 
-// Forward declaration to avoid circular dependency
+
 class Server;
 
 class Helpers {
@@ -35,14 +35,10 @@ class Helpers {
             oss << value;
             return oss.str();
         }
-
-        // Specialization for std::vector<char>
         static std::string toString(const std::vector<char> &value)
         {
             return std::string(value.begin(), value.end());
         }
-
-        // Overload for std::map<std::string, std::string>
         static std::string toString(const std::map<std::string, std::string> &value)
         {
             std::ostringstream oss;
@@ -60,7 +56,7 @@ class Helpers {
         
         struct FdInfo {
             int serverIndex;
-            int type; // 0 for server socket, 1 for client socket
+            int type;
         };
 
         static FdInfo findServerByFd(int fd, const std::vector<Server> &servers);

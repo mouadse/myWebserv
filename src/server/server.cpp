@@ -6,7 +6,7 @@
 /*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/29 13:38:15 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/17 21:57:39 by msennane         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:53:56 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,13 +62,13 @@ void stopFileStream(Client *c) {
 void logWriteFailure(Client *c, int fd, const char *callName) {
   if (c != NULL && c->fileResponse) {
     if (Logger::isDebugEnabled())
-      Logger::debug(std::string(callName) + "() failed on FD: " +
-                    Helpers::toString(fd) + " Error: " +
-                    std::string(strerror(errno)));
+      Logger::debug(std::string(callName) +
+                    "() failed on FD: " + Helpers::toString(fd) +
+                    " Error: " + std::string(strerror(errno)));
   } else {
-    Logger::error(std::string(callName) + "() failed on FD: " +
-                  Helpers::toString(fd) + " Error: " +
-                  std::string(strerror(errno)));
+    Logger::error(std::string(callName) +
+                  "() failed on FD: " + Helpers::toString(fd) +
+                  " Error: " + std::string(strerror(errno)));
   }
 }
 } // namespace
@@ -84,14 +84,6 @@ Server::Server() {
   }
   Logger::debug("socket() created FD: " + Helpers::toString(server_fd));
 
-  /*
-  When a server closes a connection, the port it was using enters a TIME_WAIT
-  state for a brief period to ensure all packets on the network have cleared
-  out. By default, attempting to bind() to that same port immediately results in
-  an "Address already in use" error. Enabling SO_REUSEADDR explicitly tells the
-  operating system that it is safe to reuse the address even if it's technically
-  still in that waiting state.
-  */
   int yes = 1;
   int setSock =
       setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -123,11 +115,6 @@ Server::Server() {
   }
   Logger::debug("listen() called with backlog 128");
 
-  // we have two categories of flags associated with file handling :
-  // File descriptor flags : associated with single specific FD eithing a
-  // process's FD table File status  flags : associated to the open file
-  // description Here the fctl is setting the file status flags  behaviour to be
-  // none blocking.
   if (fcntl(server_fd, F_SETFL, O_NONBLOCK) < 0) {
     Logger::error("fcntl(O_NONBLOCK) failed: " + std::string(strerror(errno)));
     throw std::runtime_error(
@@ -162,11 +149,9 @@ Server::Server(const WebserverConfig &cfg)
     throw std::runtime_error(
         "There is a problem in the Server->SetSocket function");
   }
-  // SO_REUSEPORT for kernel-level load balancing
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)) < 0)
     Logger::warn("setsockopt(SO_REUSEPORT) failed (non-fatal): " +
                  std::string(strerror(errno)));
-  // TCP_NODELAY to disable Nagle's algorithm
   if (setsockopt(server_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) < 0)
     Logger::warn("setsockopt(TCP_NODELAY) failed (non-fatal): " +
                  std::string(strerror(errno)));
@@ -205,7 +190,6 @@ void Server::acceptClient() {
     Logger::debug("acceptClient() called on server FD: " +
                   Helpers::toString(server_fd));
 
-  // Multi-accept loop: drain all pending connections in one epoll wakeup
   while (true) {
     sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
@@ -214,9 +198,9 @@ void Server::acceptClient() {
 
     if (client_fd < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
-        break; // No more pending connections
+        break;
       if (errno == EINTR)
-        continue; // Interrupted, retry
+        continue;
       Logger::error("accept() failed: " + std::string(strerror(errno)));
       break;
     }
@@ -224,7 +208,6 @@ void Server::acceptClient() {
       Logger::debug("accept() returned client FD: " +
                     Helpers::toString(client_fd));
 
-    // Make non-blocking
     if (fcntl(client_fd, F_SETFL, O_NONBLOCK) < 0) {
       Logger::error("fcntl(O_NONBLOCK) failed for client FD: " +
                     Helpers::toString(client_fd));
@@ -232,7 +215,6 @@ void Server::acceptClient() {
       continue;
     }
 
-    // Enable TCP_NODELAY on client socket
     int yes = 1;
     if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) <
         0) {
@@ -243,7 +225,6 @@ void Server::acceptClient() {
 
     clients[client_fd] = new Client(client_fd);
 
-    // Level-triggered epoll (no EPOLLET) with EPOLLRDHUP
     EpollManager::getInstance().add(client_fd, EPOLLIN | EPOLLRDHUP);
 
     char ip[INET_ADDRSTRLEN];
@@ -266,26 +247,20 @@ void Server::readClient(int fd) {
     return;
   }
   Client *c = it->second;
-  char buf[16384]; // 16KB stack buffer for efficiency
+  char buf[16384];
 
   ssize_t n = read(fd, buf, sizeof(buf));
 
   if (n > 0) {
-    c->request.addData(buf, n); // Zero-copy overload
+    c->request.addData(buf, n);
     if (Logger::isDebugEnabled())
       Logger::debug("Added " + Helpers::toString(n) +
                     " bytes to request buffer");
-
-    // Process all complete requests in the buffer
     while (c->request.isComplete() && !c->request.hasError()) {
       if (Logger::isDebugEnabled())
         Logger::debug("Request complete on FD: " + Helpers::toString(fd));
-
-      // Process this request
       RequestHandler handler(config);
       handler.process(c->request, c->response);
-
-      // Append response to write buffer directly
       if (c->response.hasFileBody() && c->response.getFileLength() > 0) {
         if (!startFileStream(c, c->response)) {
           setHtmlError(c->response, 500, "Internal Server Error",
@@ -299,14 +274,10 @@ void Server::readClient(int fd) {
         c->fileResponse = true;
       c->response.toBuffer(c->writeBuffer);
       c->wantWrite = true;
-
-      // Check Connection: close header
       std::string conn = c->request.getHeader("connection");
       if (conn == "close") {
         c->closeAfterWrite = true;
       }
-
-      // Reset for next request
       c->request.reset();
       c->response = HttpResponse();
     }
@@ -317,8 +288,6 @@ void Server::readClient(int fd) {
       closeClient(fd);
       return;
     }
-
-    // If we have data to write, switch to EPOLLOUT
     if (c->wantWrite && !c->writeBuffer.empty()) {
       EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP);
       if (Logger::isDebugEnabled())
@@ -332,7 +301,6 @@ void Server::readClient(int fd) {
                     " disconnected (read 0 bytes)");
     closeClient(fd);
   } else {
-    // n < 0: Real error
     Logger::error("read() failed on FD: " + Helpers::toString(fd) +
                   " Error: " + std::string(strerror(errno)));
     closeClient(fd);
@@ -352,7 +320,6 @@ void Server::writeClient(int fd) {
   Client *c = it->second;
   size_t total = c->writeBuffer.size();
 
-  // Write data if buffer has content
   if (c->writeOffset < total) {
     ssize_t n = send(fd, &c->writeBuffer[0] + c->writeOffset,
                      total - c->writeOffset, MSG_NOSIGNAL);
@@ -367,34 +334,25 @@ void Server::writeClient(int fd) {
       closeClient(fd);
       return;
     } else {
-      // n < 0: Real error
       logWriteFailure(c, fd, "send");
       closeClient(fd);
       return;
     }
   }
 
-  // If we still have data in write buffer, stay in EPOLLOUT and return
-  // (Level Triggered: epoll will fire again when writable)
   if (c->writeOffset < total) {
     return;
   }
 
   if (total > 0) {
-    // Buffer fully sent - reset for next response
     c->writeBuffer.clear();
     c->writeOffset = 0;
 
-    // Safety: Return here to ensure we don't double-write in one event.
-    // If we have streaming to do, wait for next EPOLLOUT.
     if (c->streaming) {
       return;
     }
   }
-
-  // Handle file streaming
   if (c->streaming) {
-    // Refill buffer if needed
     if (c->streamBufferOffset >= c->streamBufferSize) {
       if (c->streamRemaining == 0) {
         stopFileStream(c);
@@ -412,7 +370,6 @@ void Server::writeClient(int fd) {
           closeClient(fd);
           return;
         } else {
-          // r < 0: disk read failure
           Logger::error("read() failed on file FD: " +
                         Helpers::toString(c->streamFd));
           closeClient(fd);
@@ -420,11 +377,7 @@ void Server::writeClient(int fd) {
         }
       }
     }
-
-    // If still streaming, write to socket using what we have in buffer
     if (c->streaming && c->streamBufferSize > 0) {
-      // ssize_t n = write(fd, &c->streamBuffer[0] + c->streamBufferOffset,
-      //                   c->streamBufferSize - c->streamBufferOffset);
       ssize_t n =
           send(fd, &c->streamBuffer[0] + c->streamBufferOffset,
                c->streamBufferSize - c->streamBufferOffset, MSG_NOSIGNAL);
@@ -437,29 +390,18 @@ void Server::writeClient(int fd) {
         closeClient(fd);
         return;
       } else {
-        // n < 0: Real error
         logWriteFailure(c, fd, "send");
         closeClient(fd);
         return;
       }
-
-      // If we didn't write everything, return and wait for next EPOLLOUT
       if (c->streamBufferOffset < c->streamBufferSize) {
         return;
       }
     }
-
-    // If streaming is still active here, it means we consumed our current
-    // buffer but have more to read from disk. We return to let the next
-    // cycle/event handle it. However, for efficiency, since we just drained our
-    // buffer to the socket, we COULD try to refill and write again, but in
-    // Level Triggered we can just return. But we must stay in EPOLLOUT.
     if (c->streaming) {
       return;
     }
   }
-
-  // Done writing (buffer empty and not streaming)
   c->wantWrite = false;
   c->fileResponse = false;
   if (c->closeAfterWrite) {
@@ -469,7 +411,6 @@ void Server::writeClient(int fd) {
     return;
   }
 
-  // Switch back to EPOLLIN
   EpollManager::getInstance().mod(fd, EPOLLIN | EPOLLRDHUP);
   if (Logger::isDebugEnabled())
     Logger::debug("Response fully sent on FD: " + Helpers::toString(fd));

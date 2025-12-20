@@ -34,7 +34,6 @@ std::string getMimeType(const std::string &path) {
   if (dotPos == std::string::npos)
     return "application/octet-stream";
   std::string ext = path.substr(dotPos + 1);
-  // to lower case
   std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
   if (ext == "html" || ext == "htm")
@@ -98,12 +97,11 @@ std::string generateDirectoryListing(const std::string &path,
       name = Helpers::escapeHtml(name);
       href = Helpers::escapeHtml(href);
 
-      // Simple formatting
       ss << "<a href=\"" << href << "\">" << name << "</a><br>";
     }
     closedir(dir);
   } else {
-    return ""; // Error handled by caller
+    return "";
   }
 
   ss << "</pre><hr></body></html>";
@@ -118,16 +116,10 @@ void Get::handle(const HTTPRequest &request, HttpResponse &response,
   std::string path;
   std::string locationPath = location.getPath();
 
-  if (!location.getAlias().empty() &&
-      target.rfind(locationPath, 0) ==
-          0) { // Check if target starts with locationPath
-    // If an alias is defined and the target matches the location path, use the
-    // alias. The target needs to have the location block's path stripped and
-    // then the alias prepended.
+  if (!location.getAlias().empty() && target.rfind(locationPath, 0) == 0) {
     std::string relativeTarget = target.substr(locationPath.length());
     path = joinPaths(location.getAlias(), relativeTarget);
   } else {
-    // Otherwise, use the root as before.
     path = joinPaths(location.getRoot(), target);
   }
 
@@ -139,33 +131,24 @@ void Get::handle(const HTTPRequest &request, HttpResponse &response,
   }
 
   if (S_ISDIR(pathStat.st_mode)) {
-    // It's a directory
-
-    // 0. Redirect to trailing slash if missing (NGINX behavior)
-    // This ensures relative URLs in directory listings resolve correctly
     if (target.empty() || target[target.length() - 1] != '/') {
       response.setStatus(301, "Moved Permanently");
       response.setHeader("Location", target + "/");
       response.setBody("");
       return;
     }
-
-    // 1. Check for index file
     std::string indexFile = location.getIndex();
     if (!indexFile.empty()) {
       std::string indexPath = joinPaths(path, indexFile);
       struct stat indexStat;
       if (stat(indexPath.c_str(), &indexStat) == 0 &&
           !S_ISDIR(indexStat.st_mode)) {
-        // Serve index file
         path = indexPath;
         pathStat = indexStat;
-        // Fall through to file serving logic
         goto serve_file;
       }
     }
 
-    // 2. Check Autoindex
     if (location.getAutoindex()) {
       std::string listing = generateDirectoryListing(path, target);
       if (listing.empty()) {
@@ -179,13 +162,11 @@ void Get::handle(const HTTPRequest &request, HttpResponse &response,
       return;
     }
 
-    // 3. Forbidden
     setHtmlError(response, 403, "Forbidden", "Directory listing is disabled.");
     return;
   }
 
 serve_file:
-  // It's a file
   if (access(path.c_str(), R_OK) != 0) {
     setHtmlError(response, 403, "Forbidden", "Permission denied.");
     return;
@@ -198,7 +179,6 @@ serve_file:
   }
   size_t fileSize = static_cast<size_t>(pathStat.st_size);
 
-  // Range Header Handling
   std::string rangeHeader = request.getHeader("Range");
   if (!rangeHeader.empty() && rangeHeader.compare(0, 6, "bytes=") == 0) {
     if (fileSize == 0) {
@@ -217,7 +197,6 @@ serve_file:
       std::string endStr = rangeSet.substr(dashPos + 1);
 
       if (startStr.empty()) {
-        // Suffix: bytes=-500
         if (!endStr.empty()) {
           size_t suffix;
           std::stringstream ss(endStr);
@@ -249,7 +228,6 @@ serve_file:
       }
     }
 
-    // Validate
     if (start >= fileSize || start > end) {
       response.setStatus(416, "Range Not Satisfiable");
       std::stringstream cr;
@@ -258,7 +236,6 @@ serve_file:
       return;
     }
 
-    // Final bounds check
     if (end >= fileSize)
       end = fileSize - 1;
 
@@ -295,8 +272,6 @@ serve_file:
     return;
   }
 
-  // For files without Range header:
-  // Always advertise Accept-Ranges so browser knows it can request ranges
   response.setHeader("Accept-Ranges", "bytes");
   response.setHeader("Content-Type", getMimeType(path));
 
@@ -306,19 +281,15 @@ serve_file:
     return;
   }
 
-  // Small file: try cache first, then read from disk
-  // Cache is used for small files (<=1MB) to avoid repeated disk I/O
   FileCache &cache = FileCache::getInstance();
   std::vector<char> cachedData = cache.get(path, pathStat.st_mtime);
 
   if (!cachedData.empty()) {
-    // Cache hit - serve from memory
     response.setBody(cachedData);
     response.setStatus(200, "OK");
     return;
   }
 
-  // Cache miss - read from disk
   std::ifstream file(path.c_str(), std::ios::binary);
   if (!file) {
     setHtmlError(response, 500, "Internal Server Error",
@@ -332,7 +303,6 @@ serve_file:
   }
   std::vector<char> fileBuffer(fileSize);
   if (file.read(&fileBuffer[0], fileSize)) {
-    // Store in cache for future requests (cache handles size limits)
     cache.put(path, fileBuffer, pathStat.st_mtime);
 
     response.setBody(fileBuffer);

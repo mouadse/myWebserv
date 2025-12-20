@@ -49,7 +49,7 @@ void setHtmlError(HttpResponse &response, int code, const std::string &message,
   response.setBody(body.str());
   response.setHeader("Content-Type", "text/html");
 }
-} // namespace
+}
 
 void Delete::handle(const HTTPRequest &request, HttpResponse &response,
                     const LocationBlock &location) {

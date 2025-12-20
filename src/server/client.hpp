@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: webserv <webserv@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/29 13:37:59 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/08 12:52:08 by webserv         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:48:22 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,15 +26,14 @@
 
 class Client {
 public:
-  int fd;              // the client's socket
-  HTTPRequest request; // to handle the incoming request
+  int fd;
+  HTTPRequest request;
   HttpResponse response;
-  std::vector<char> writeBuffer; // data TO client   (server response)
-  size_t writeOffset;   // current position in writeBuffer (avoids O(n) erase)
-  bool wantWrite;       // whether we should switch to EPOLLOUT
-  bool closeAfterWrite; // close connection after flushing buffer (Connection:
-                        // close)
-  bool fileResponse;    // queued response includes a file/range payload
+  std::vector<char> writeBuffer;
+  size_t writeOffset;
+  bool wantWrite;
+  bool closeAfterWrite;
+  bool fileResponse;
   static const size_t STREAM_CHUNK_SIZE = 64 * 1024;
   bool streaming;
   int streamFd;

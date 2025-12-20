@@ -13,10 +13,11 @@
 
 #include "RequestHandler.hpp"
 #include "../cgi/CgiHandler.hpp"
+#include "../utils/PathUtils.hpp"
 #include "Methods/Delete.hpp"
 #include "Methods/Get.hpp"
 #include "Methods/Post.hpp"
-#include "../utils/PathUtils.hpp"
+
 namespace {
 std::string getExtension(const std::string &path) {
   std::string::size_type slash = path.find_last_of('/');
@@ -27,8 +28,6 @@ std::string getExtension(const std::string &path) {
     return "";
   return path.substr(dot);
 }
-} // namespace
-namespace {
 bool isAdminPath(const std::string &target) {
   return target == "/admin" || target.compare(0, 7, "/admin/") == 0;
 }
@@ -60,9 +59,6 @@ void RequestHandler::respondMethodNotAllowed(const LocationBlock &location,
 
 void RequestHandler::process(const HTTPRequest &request,
                              HttpResponse &response) {
-  // Fixed bug:
-  // Initialize response object for each request to avoid residual data
-  // from previous requests that could lead to incorrect responses.
   response = HttpResponse();
   response.setBody("");
   const std::string method = request.getMethod();

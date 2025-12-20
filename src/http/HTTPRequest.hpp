@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HTTPRequest.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: webserv <webserv@student.42.fr>              +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/02 13:48:34 by webserv          #+#    #+#             */
-/*   Updated: 2025/12/12 13:04:00 by webserv           ###   ########.fr       */
+/*   Updated: 2025/12/20 21:42:39 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,7 +58,7 @@ public:
   HTTPRequest();
   HTTPRequest(const std::string &raw_request);
   void addData(const std::vector<char> &new_chunk);
-  void addData(const char *data, size_t len); // Zero-copy overload
+  void addData(const char *data, size_t len);
   void reset();
   bool isComplete() const;
   bool hasError() const;

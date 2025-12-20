@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HTTPResponse.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ebelkadi <ebelkadi@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/02 13:48:56 by webserv          #+#    #+#             */
-/*   Updated: 2025/12/02 17:28:08 by ebelkadi         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:32:40 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,14 +85,12 @@ std::string HttpResponse::getBodyAsString() const {
 
 const std::vector<char> &HttpResponse::getBody() const { return body; }
 
-// Efficient pre-sized buffer construction using memcpy
 void HttpResponse::toBuffer(std::vector<char> &out) const {
-  // Build status line
+
   std::ostringstream statusLine;
   statusLine << "HTTP/1.1 " << statusCode << " " << statusMessage << "\r\n";
   std::string sl = statusLine.str();
 
-  // Build headers
   std::string hdrs;
   for (std::map<std::string, std::string>::const_iterator it = headers.begin();
        it != headers.end(); ++it) {
@@ -100,12 +98,10 @@ void HttpResponse::toBuffer(std::vector<char> &out) const {
   }
   hdrs += "\r\n";
 
-  // Calculate total size and pre-allocate
   size_t totalSize = sl.size() + hdrs.size() + body.size();
   size_t oldSize = out.size();
   out.resize(oldSize + totalSize);
 
-  // Use memcpy for efficient copying
   char *dest = &out[oldSize];
   std::memcpy(dest, sl.c_str(), sl.size());
   dest += sl.size();

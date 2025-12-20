@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HTTPRequest.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: webserv <webserv@student.42.fr>              +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/02 13:48:24 by webserv          #+#    #+#             */
-/*   Updated: 2025/12/12 13:03:48 by webserv           ###   ########.fr       */
+/*   Updated: 2025/12/20 21:42:18 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,7 +77,6 @@ void HTTPRequest::addData(const char *data, size_t len) {
 }
 
 bool HTTPRequest::tryParseRequestLine() {
-  // Use std::search for efficient CRLF detection
   static const char crlf[] = {'\r', '\n'};
   std::vector<char>::iterator it =
       std::search(buffer.begin() + parse_offset, buffer.end(), crlf, crlf + 2);
@@ -120,7 +119,6 @@ bool HTTPRequest::tryParseRequestLine() {
 }
 
 bool HTTPRequest::tryParseHeaders() {
-  // Use std::search for efficient double-CRLF detection
   static const char crlfcrlf[] = {'\r', '\n', '\r', '\n'};
   std::vector<char>::iterator crlfIt = std::search(
       buffer.begin() + parse_offset, buffer.end(), crlfcrlf, crlfcrlf + 4);
@@ -181,7 +179,6 @@ bool HTTPRequest::tryParseHeaders() {
       return false;
     }
     content_length = static_cast<size_t>(len);
-    // Pre-reserve body capacity to avoid reallocations
     body.reserve(content_length);
   }
   if (is_chunked && content_length > 0) {

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Helpers.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ebelkadi <ebelkadi@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/08 01:49:12 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/08 03:06:53 by ebelkadi         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:58:05 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,60 +16,65 @@
 
 Helpers::Helpers() {}
 
-Helpers::Helpers(const Helpers &other) {
-    (void)other;
-}
+Helpers::Helpers(const Helpers &other) { (void)other; }
 
 Helpers &Helpers::operator=(const Helpers &other) {
-    if (this != &other) {
-        // no state to copy currently
-    }
-    return *this;
+  if (this != &other) {
+  }
+  return *this;
 }
 
 Helpers::~Helpers() {}
 
+Helpers::FdInfo Helpers::findServerByFd(int fd,
+                                        const std::vector<Server> &servers) {
+  FdInfo result;
 
+  for (size_t j = 0; j < servers.size(); ++j) {
+    if (fd == servers[j].server_fd) {
+      result.serverIndex = j;
+      result.type = 0;
+      return result;
+    }
+  }
 
-Helpers::FdInfo Helpers::findServerByFd(int fd, const std::vector<Server> &servers) {
-    FdInfo result;
-    
-    // First check if it's a server socket
-    for (size_t j = 0; j < servers.size(); ++j) {
-        if (fd == servers[j].server_fd) {
-            result.serverIndex = j;
-            result.type = 0; // Server socket
-            return result;
-        }
+  for (size_t i = 0; i < servers.size(); ++i) {
+    if (servers[i].hasClient(fd)) {
+      result.serverIndex = i;
+      result.type = 1;
+      return result;
     }
-    
-    // Then check if it's a client socket
-    for (size_t i = 0; i < servers.size(); ++i) {
-        if (servers[i].hasClient(fd)) {
-            result.serverIndex = i;
-            result.type = 1; // Client socket
-            return result;
-        }
-    }
-    
-    result.serverIndex = -1;
-    result.type = -1; // Not found
-    return result;
+  }
+
+  result.serverIndex = -1;
+  result.type = -1;
+  return result;
 }
 
 std::string Helpers::escapeHtml(const std::string &data) {
-    std::string buffer;
-    buffer.reserve(data.size() * 1.1);
-    for (size_t i = 0; i < data.size(); ++i) {
-        switch (data[i]) {
-            case '&':  buffer += "&amp;"; break;
-            case '\"': buffer += "&quot;"; break;
-            case '\'': buffer += "&apos;"; break;
-            case '<':  buffer += "&lt;"; break;
-            case '>':  buffer += "&gt;"; break;
-            default:   buffer += data[i]; break;
-        }
+  std::string buffer;
+  buffer.reserve(data.size() * 1.1);
+  for (size_t i = 0; i < data.size(); ++i) {
+    switch (data[i]) {
+    case '&':
+      buffer += "&amp;";
+      break;
+    case '\"':
+      buffer += "&quot;";
+      break;
+    case '\'':
+      buffer += "&apos;";
+      break;
+    case '<':
+      buffer += "&lt;";
+      break;
+    case '>':
+      buffer += "&gt;";
+      break;
+    default:
+      buffer += data[i];
+      break;
     }
-    return buffer;
+  }
+  return buffer;
 }
-

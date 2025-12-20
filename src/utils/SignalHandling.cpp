@@ -123,7 +123,6 @@ void SignalHandling::consume() {
     ssize_t n = ::read(_pipeRead, buf, sizeof(buf));
     if (n > 0)
       continue;
-    // n <= 0: EOF or error, stop consuming
     break;
   }
 }

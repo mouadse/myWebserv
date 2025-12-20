@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Logger.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ebelkadi <ebelkadi@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/08 01:11:47 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/08 01:31:14 by ebelkadi         ###   ########.fr       */
+/*   Updated: 2025/12/20 21:59:13 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,7 +92,6 @@ void Logger::writeLog(LogLevel level, const std::string &message) {
   }
 }
 
-// Debug mode control
 void Logger::enableDebugMode() { currentLevel = DEBUG; }
 
 void Logger::disableDebugMode() { currentLevel = INFO; }
@@ -107,7 +106,6 @@ bool Logger::isLevelEnabled(LogLevel level) const {
   return level >= currentLevel;
 }
 
-// Configuration
 void Logger::setLogLevel(LogLevel level) { currentLevel = level; }
 
 void Logger::setLogToConsole(bool enable) { logToConsole = enable; }
@@ -125,7 +123,6 @@ void Logger::setLogToFile(bool enable, const std::string &filename) {
   }
 }
 
-// Logging methods
 void Logger::debug(const std::string &message) {
   getInstance().writeLog(DEBUG, message);
 }
@@ -142,7 +139,6 @@ void Logger::error(const std::string &message) {
   getInstance().writeLog(ERROR, message);
 }
 
-// Static convenience methods
 void Logger::log(LogLevel level, const std::string &message) {
   getInstance().writeLog(level, message);
 }

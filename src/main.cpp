@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: webserv <webserv@student.42.fr>          +#+  +:+       +#+        */
+/*   By: msennane <msennane@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/29 13:38:10 by ebelkadi          #+#    #+#             */
-/*   Updated: 2025/12/13 20:45:03 by ebelkadi         ###   ########.fr       */
+/*   Updated: 2025/12/20 22:01:07 by msennane         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,7 @@
 #include <iostream>
 
 static std::vector<Server> setServer(int argc, char **argv) {
-  std::string config_path = "./config/demo.conf"; // Default config path
+  std::string config_path = "./config/demo.conf";
   if (argc > 1)
     config_path = argv[1];
 
@@ -38,10 +38,8 @@ static std::vector<Server> setServer(int argc, char **argv) {
     throw std::runtime_error(
         "Config file parsed successfully but contains no server blocks.");
   }
+  //   parser.print(std::cout);
 
-  //   parser.print(std::cout); // Uncomment for detailed config output
-
-  // Create server instances from configurations
   std::vector<Server> servers;
   uint16_t port;
   for (size_t i = 0; i < configs.size(); i++) {
@@ -100,16 +98,13 @@ static void runServer(std::vector<Server> &servers) {
       Server &server = servers[info.serverIndex];
 
       if (info.type == 0) {
-        // Server socket - accept new connection
         server.acceptClient();
       } else if (info.type == 1) {
-        // Client socket - handle events (check errors/hangup first)
         if (events[i].events & (EPOLLHUP | EPOLLERR)) {
           server.closeClient(fd);
           continue;
         }
         if (events[i].events & EPOLLRDHUP) {
-          // Peer shutdown - read remaining data then close
           server.readClient(fd);
           if (server.hasClient(fd))
             server.closeClient(fd);
@@ -134,9 +129,7 @@ int main(int argc, char **argv) {
   std::vector<Server> servers;
 
   try {
-    // Parse config files and create server(s) :
     servers = setServer(argc, argv);
-    // Run the event loop
     runServer(servers);
 
   } catch (const std::exception &e) {
