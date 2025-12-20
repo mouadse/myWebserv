@@ -34,7 +34,6 @@ SRCS = src/main.cpp \
        src/http/Methods/Delete.cpp \
        src/http/Methods/Get.cpp \
        src/http/Methods/Post.cpp \
-       src/http/Methods/MultipartParser.cpp \
        src/server/client.cpp \
        src/server/EpollManager.cpp \
        src/server/server.cpp \
