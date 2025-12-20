@@ -1,4 +1,3 @@
-
 #include "SignalHandling.hpp"
 #include "utils/Logger.hpp"
 
@@ -45,7 +44,8 @@ void SignalHandling::handleStopSignal(int signo) {
 
   if (s_writeFd >= 0) {
     unsigned char byte = 1;
-    (void)::write(s_writeFd, &byte, 1);
+    ssize_t ret = ::write(s_writeFd, &byte, 1);
+    (void)ret;
   }
 }
 
