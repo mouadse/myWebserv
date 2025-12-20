@@ -188,9 +188,10 @@ void Server::acceptClient() {
 
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &clientAddr.sin_addr, ip, INET_ADDRSTRLEN);
-    Logger::info("Client connected: " + std::string(ip) + ":" +
-                 Helpers::toString(ntohs(clientAddr.sin_port)) +
-                 " (FD: " + Helpers::toString(client_fd) + ")");
+    if (Logger::isDebugEnabled())
+      Logger::debug("Client connected: " + std::string(ip) + ":" +
+                    Helpers::toString(ntohs(clientAddr.sin_port)) +
+                    " (FD: " + Helpers::toString(client_fd) + ")");
   }
   if (Logger::isDebugEnabled())
     Logger::debug("Total clients connected: " +
@@ -226,9 +227,8 @@ void Server::readClient(int fd) {
         RequestHandler handler(config);
         handler.process(c->request, c->response);
 
-        // Append response to write buffer (don't overwrite previous responses)
-        std::string res = c->response.toString();
-        c->writeBuffer.insert(c->writeBuffer.end(), res.begin(), res.end());
+        // Append response to write buffer directly (avoids extra copy)
+        c->response.toBuffer(c->writeBuffer);
         c->wantWrite = true;
 
         // Check Connection: close header
@@ -246,8 +246,9 @@ void Server::readClient(int fd) {
         break;
 
     } else if (n == 0) {
-      Logger::info("Client FD: " + Helpers::toString(fd) +
-                   " disconnected (read 0 bytes)");
+      if (Logger::isDebugEnabled())
+        Logger::debug("Client FD: " + Helpers::toString(fd) +
+                      " disconnected (read 0 bytes)");
       closeClient(fd);
       return;
     } else {
@@ -323,13 +324,16 @@ void Server::writeClient(int fd) {
     c->wantWrite = false;
 
     if (c->closeAfterWrite) {
-      Logger::info("Connection: close - closing FD: " + Helpers::toString(fd));
+      if (Logger::isDebugEnabled())
+        Logger::debug("Connection: close - closing FD: " +
+                      Helpers::toString(fd));
       closeClient(fd);
       return;
     }
 
     EpollManager::getInstance().mod(fd, EPOLLIN | EPOLLRDHUP | EPOLLET);
-    Logger::info("Response fully sent on FD: " + Helpers::toString(fd));
+    if (Logger::isDebugEnabled())
+      Logger::debug("Response fully sent on FD: " + Helpers::toString(fd));
   } else {
     // Still have data, keep EPOLLOUT
     EpollManager::getInstance().mod(fd, EPOLLOUT | EPOLLRDHUP | EPOLLET);
@@ -360,8 +364,9 @@ void Server::closeClient(int fd) {
   if (clients.count(fd)) {
     delete clients[fd];
     clients.erase(fd);
-    Logger::info("Client FD: " + Helpers::toString(fd) +
-                 " closed and cleaned up");
+    if (Logger::isDebugEnabled())
+      Logger::debug("Client FD: " + Helpers::toString(fd) +
+                    " closed and cleaned up");
     if (Logger::isDebugEnabled())
       Logger::debug("Remaining clients: " + Helpers::toString(clients.size()));
   } else {

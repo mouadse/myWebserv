@@ -1,4 +1,5 @@
 #include "Get.hpp"
+#include "../../utils/FileCache.hpp"
 #include "../../utils/Helpers.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -229,8 +230,8 @@ serve_file:
           std::stringstream ss(endStr);
           ss >> suffix;
           if (ss.fail()) {
-             setHtmlError(response, 400, "Bad Request", "Invalid Range suffix.");
-             return;
+            setHtmlError(response, 400, "Bad Request", "Invalid Range suffix.");
+            return;
           }
           if (suffix < (size_t)fileSize)
             start = (size_t)fileSize - suffix;
@@ -241,15 +242,15 @@ serve_file:
         std::stringstream ss(startStr);
         ss >> start;
         if (ss.fail()) {
-            setHtmlError(response, 400, "Bad Request", "Invalid Range start.");
-            return;
+          setHtmlError(response, 400, "Bad Request", "Invalid Range start.");
+          return;
         }
         if (!endStr.empty()) {
           std::stringstream ss2(endStr);
           ss2 >> end;
           if (ss2.fail()) {
-              setHtmlError(response, 400, "Bad Request", "Invalid Range end.");
-              return;
+            setHtmlError(response, 400, "Bad Request", "Invalid Range end.");
+            return;
           }
         }
       }
@@ -329,10 +330,26 @@ serve_file:
     }
   }
 
-  // Small file: load entirely (original behavior)
+  // Small file: try cache first, then read from disk
+  // Cache is used for small files (<=1MB) to avoid repeated disk I/O
+  FileCache &cache = FileCache::getInstance();
+  std::vector<char> cachedData = cache.get(path, pathStat.st_mtime);
+
+  if (!cachedData.empty()) {
+    // Cache hit - serve from memory
+    response.setBody(cachedData);
+    response.setStatus(200, "OK");
+    response.setHeader("Content-Type", getMimeType(path));
+    return;
+  }
+
+  // Cache miss - read from disk
   file.seekg(0, std::ios::beg);
   std::vector<char> fileBuffer(fileSize);
   if (file.read(&fileBuffer[0], fileSize)) {
+    // Store in cache for future requests (cache handles size limits)
+    cache.put(path, fileBuffer, pathStat.st_mtime);
+
     response.setBody(fileBuffer);
     response.setStatus(200, "OK");
     response.setHeader("Content-Type", getMimeType(path));

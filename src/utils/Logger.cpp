@@ -75,21 +75,20 @@ void Logger::writeLog(LogLevel level, const std::string &message) {
 
   if (logToConsole) {
     if (level == ERROR) {
-      std::cerr << "\033[1;31m" << logEntry.str() << "\033[0m" << std::endl;
+      std::cerr << "\033[1;31m" << logEntry.str() << "\033[0m\n";
     } else if (level == WARN) {
-      std::cerr << "\033[1;33m" << logEntry.str() << "\033[0m" << std::endl;
+      std::cerr << "\033[1;33m" << logEntry.str() << "\033[0m\n";
     } else if (level == INFO) {
-      std::cout << "\033[1;32m" << logEntry.str() << "\033[0m" << std::endl;
+      std::cout << "\033[1;32m" << logEntry.str() << "\033[0m\n";
     } else if (level == DEBUG) {
-      std::cout << "\033[1;36m" << logEntry.str() << "\033[0m" << std::endl;
+      std::cout << "\033[1;36m" << logEntry.str() << "\033[0m\n";
     } else {
-      std::cout << logEntry.str() << std::endl;
+      std::cout << logEntry.str() << "\n";
     }
   }
 
   if (logToFile && logFile.is_open()) {
-    logFile << logEntry.str() << std::endl;
-    logFile.flush();
+    logFile << logEntry.str() << "\n";
   }
 }
 
@@ -101,6 +100,12 @@ void Logger::disableDebugMode() { currentLevel = INFO; }
 bool Logger::isDebugMode() const { return (currentLevel == DEBUG); }
 
 bool Logger::isDebugEnabled() { return getInstance().isDebugMode(); }
+
+bool Logger::isInfoEnabled() { return getInstance().isLevelEnabled(INFO); }
+
+bool Logger::isLevelEnabled(LogLevel level) const {
+  return level >= currentLevel;
+}
 
 // Configuration
 void Logger::setLogLevel(LogLevel level) { currentLevel = level; }

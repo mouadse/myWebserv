@@ -181,6 +181,8 @@ bool HTTPRequest::tryParseHeaders() {
       return false;
     }
     content_length = static_cast<size_t>(len);
+    // Pre-reserve body capacity to avoid reallocations
+    body.reserve(content_length);
   }
   if (is_chunked && content_length > 0) {
     state = ERROR;

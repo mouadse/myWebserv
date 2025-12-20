@@ -119,21 +119,22 @@ void EpollManager::add(int fd, uint32_t events) {
     throw std::runtime_error("epoll_ctl ADD failed");
   }
 
-  // Log event flags
-  std::string eventStr;
-  if (events & EPOLLIN)
-    eventStr += "EPOLLIN ";
-  if (events & EPOLLOUT)
-    eventStr += "EPOLLOUT ";
-  if (events & EPOLLERR)
-    eventStr += "EPOLLERR ";
-  if (events & EPOLLHUP)
-    eventStr += "EPOLLHUP ";
-  if (events & EPOLLET)
-    eventStr += "EPOLLET ";
+  if (Logger::isDebugEnabled()) {
+    std::string eventStr;
+    if (events & EPOLLIN)
+      eventStr += "EPOLLIN ";
+    if (events & EPOLLOUT)
+      eventStr += "EPOLLOUT ";
+    if (events & EPOLLERR)
+      eventStr += "EPOLLERR ";
+    if (events & EPOLLHUP)
+      eventStr += "EPOLLHUP ";
+    if (events & EPOLLET)
+      eventStr += "EPOLLET ";
 
-  Logger::info("Added FD: " + Helpers::toString(fd) + " to epoll (FD: " +
-               Helpers::toString(epfd) + ") with events: " + eventStr);
+    Logger::debug("Added FD: " + Helpers::toString(fd) + " to epoll (FD: " +
+                  Helpers::toString(epfd) + ") with events: " + eventStr);
+  }
 }
 
 void EpollManager::mod(int fd, uint32_t events) {
@@ -161,21 +162,22 @@ void EpollManager::mod(int fd, uint32_t events) {
     throw std::runtime_error("epoll_ctl MOD failed");
   }
 
-  // Log event flags
-  std::string eventStr;
-  if (events & EPOLLIN)
-    eventStr += "EPOLLIN ";
-  if (events & EPOLLOUT)
-    eventStr += "EPOLLOUT ";
-  if (events & EPOLLERR)
-    eventStr += "EPOLLERR ";
-  if (events & EPOLLHUP)
-    eventStr += "EPOLLHUP ";
-  if (events & EPOLLET)
-    eventStr += "EPOLLET ";
+  if (Logger::isDebugEnabled()) {
+    std::string eventStr;
+    if (events & EPOLLIN)
+      eventStr += "EPOLLIN ";
+    if (events & EPOLLOUT)
+      eventStr += "EPOLLOUT ";
+    if (events & EPOLLERR)
+      eventStr += "EPOLLERR ";
+    if (events & EPOLLHUP)
+      eventStr += "EPOLLHUP ";
+    if (events & EPOLLET)
+      eventStr += "EPOLLET ";
 
-  Logger::info("Modified FD: " + Helpers::toString(fd) +
-               " in epoll to events: " + eventStr);
+    Logger::debug("Modified FD: " + Helpers::toString(fd) +
+                  " in epoll to events: " + eventStr);
+  }
 }
 
 void EpollManager::remove(int fd) {
@@ -199,8 +201,9 @@ void EpollManager::remove(int fd) {
     throw std::runtime_error("epoll_ctl DEL failed");
   }
 
-  Logger::info("Removed FD: " + Helpers::toString(fd) +
-               " from epoll (FD: " + Helpers::toString(epfd) + ")");
+  if (Logger::isDebugEnabled())
+    Logger::debug("Removed FD: " + Helpers::toString(fd) +
+                  " from epoll (FD: " + Helpers::toString(epfd) + ")");
 }
 
 int EpollManager::wait(epoll_event *events, int maxEvents) {

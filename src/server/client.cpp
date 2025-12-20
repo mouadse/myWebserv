@@ -38,7 +38,8 @@ Client::Client(int fd) {
   // 3. Pre-reserve buffer sizes (security: predictable memory use)
   // this->writeBuffer.  // enough for your HTTP response
 
-  Logger::info("Client object created for FD: " + Helpers::toString(fd));
+  if (Logger::isDebugEnabled())
+    Logger::debug("Client object created for FD: " + Helpers::toString(fd));
 }
 
 // client for the test

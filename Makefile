@@ -40,6 +40,7 @@ SRCS = src/main.cpp \
        src/server/server.cpp \
        src/utils/Helpers.cpp \
 			 src/utils/SignalHandling.cpp \
+       src/utils/FileCache.cpp \
        src/utils/Logger.cpp
 
 OBJS = $(SRCS:.cpp=.o)
