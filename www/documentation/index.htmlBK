@@ -1,11 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
   <meta name="description" content="C++98 HTTP server, epoll powered, CGI ready.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
-  <title>Webserv - 42 Project</title>
+  <title>Webserv Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -13,110 +15,6 @@
     rel="stylesheet">
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/theme.js"></script>
-  <style>
-    .team-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-    
-    .member-card {
-      background: rgba(26, 32, 44, 0.8);
-      border-radius: 15px;
-      padding: 2rem;
-      border: 1px solid #2d3748;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    .member-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-      border-color: #4299e1;
-    }
-    
-    .member-header {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .member-image {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 3px solid #4299e1;
-      box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
-    }
-    
-    .member-info h2 {
-      color: #63b3ed;
-      font-size: 1.8rem;
-      margin-bottom: 0.3rem;
-    }
-    
-    .login {
-      color: #38b2ac;
-      font-family: 'Courier New', monospace;
-      font-size: 1.1rem;
-      background: rgba(56, 178, 172, 0.1);
-      padding: 0.2rem 0.8rem;
-      border-radius: 4px;
-      display: inline-block;
-    }
-    
-    .role-section {
-      margin-top: 1rem;
-    }
-    
-    .role-title {
-      color: #cbd5e0;
-      font-size: 1.1rem;
-      margin-bottom: 0.8rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .role-title::before {
-      content: "▸";
-      color: #4299e1;
-    }
-    
-    .role-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-    }
-    
-    .role-tag {
-      background: linear-gradient(90deg, #2d3748, #4a5568);
-      color: #e2e8f0;
-      padding: 0.4rem 1rem;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      border: 1px solid #4a5568;
-    }
-    
-    .leadership-tag {
-      background: linear-gradient(90deg, #2b6cb0, #3182ce);
-      font-weight: bold;
-      border-color: #4299e1;
-    }
-    
-    @media (max-width: 768px) {
-      .team-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .member-header {
-        flex-direction: column;
-        text-align: center;
-      }
-    }
-  </style>
 </head>
 
 <body>
@@ -161,57 +59,6 @@
             navigate, extend, or debug with confidence.
           </p>
           <p class="badge">C++98 / Non-blocking / epoll</p>
-        </section>
-
-        <section style="--i:1.5;">
-          <h2>Team & Roles</h2>
-          <p>Meet the team behind this HTTP server implementation:</p>
-          <div class="team-grid">
-            <!-- Member 1 -->
-            <div class="member-card">
-              <div class="member-header">
-                <img src="https://cdn.intra.42.fr/users/15c25cd8a2812084eeb7cfc496ffb305/msennane.jpeg" 
-                     alt="Mouad Sennane" 
-                     class="member-image"
-                     onerror="this.src='https://via.placeholder.com/100/2d3748/63b3ed?text=M'">
-                <div class="member-info">
-                  <h2>Mouad Sennane</h2>
-                  <span class="login">msennane</span>
-                </div>
-              </div>
-              <div class="role-section">
-                <div class="role-title">Roles</div>
-                <div class="role-tags">
-                  <span class="role-tag">Config Parsing</span>
-                  <span class="role-tag">CGI Implementation</span>
-                  <span class="role-tag">DELETE Method</span>
-                  <span class="role-tag leadership-tag">CTO of the Team</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Member 2 -->
-            <div class="member-card">
-              <div class="member-header">
-                <img src="https://cdn.intra.42.fr/users/09e70d9cfebf092c944a25ed6e3c196e/ebelkadi.jpeg" 
-                     alt="Mehdi Belkadi" 
-                     class="member-image"
-                     onerror="this.src='https://via.placeholder.com/100/2d3748/63b3ed?text=Me'">
-                <div class="member-info">
-                  <h2>Mehdi Belkadi</h2>
-                  <span class="login">ebelkadi</span>
-                </div>
-              </div>
-              <div class="role-section">
-                <div class="role-title">Roles</div>
-                <div class="role-tags">
-                  <span class="role-tag">Multiplexing</span>
-                  <span class="role-tag">GET Method</span>
-                  <span class="role-tag leadership-tag">Manager of the Team</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </section>
 
         <section style="--i:2;">
