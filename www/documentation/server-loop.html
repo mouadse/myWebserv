@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Epoll, signals, and concurrency.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>Event Loop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">Epoll, signals, and concurrency.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a class="active" href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Event Loop</div>
+          <h1>Single epoll loop, many responsibilities.</h1>
+          <p>
+            The server uses a single epoll instance to track listening
+            sockets, client sockets, CGI pipes, and signal notifications.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Epoll manager</h2>
+          <p>
+            <code>EpollManager</code> is a small singleton that wraps
+            <code>epoll_ctl</code> and <code>epoll_wait</code>, with verbose
+            logging when debug mode is enabled.
+          </p>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Accept loop</h2>
+          <p>
+            <code>Server::acceptClient</code> accepts all available
+            connections, marks client sockets non-blocking, and registers
+            them with epoll for <code>EPOLLIN</code> and
+            <code>EPOLLRDHUP</code>.
+          </p>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Dispatch by file descriptor</h2>
+          <p>
+            <code>Helpers::findServerByFd</code> determines whether an fd is
+            a listening socket, a client socket, or a CGI pipe. The main loop
+            dispatches accordingly.
+          </p>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Signals in epoll</h2>
+          <p>
+            <code>SignalHandling</code> installs a self-pipe to translate
+            SIGINT, SIGTERM, and SIGQUIT into epoll events. This keeps signal
+            handling non-blocking and predictable.
+          </p>
+          <div class="callout">
+            Graceful shutdown closes all clients and listening sockets before
+            destroying the epoll instance.
+          </div>
+        </section>
+
+        <div class="footer">
+          The loop logic lives in <code>src/main.cpp</code> and
+          <code>src/server/server.cpp</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

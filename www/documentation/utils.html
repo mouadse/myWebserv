@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Helpers, logging, caching.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>Utilities</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">Helpers, logging, caching.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a class="active" href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Utilities</div>
+          <h1>Small tools that keep the core clean.</h1>
+          <p>
+            The utilities in <code>src/utils</code> are designed to keep the
+            rest of the codebase focused on HTTP and networking behavior.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Logger</h2>
+          <p>
+            <code>Logger</code> supports levels (DEBUG, INFO, WARN, ERROR),
+            console color output, and optional file logging. Debug mode is
+            toggled by <code>Logger::enableDebugMode</code>.
+          </p>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Helpers</h2>
+          <ul>
+            <li><code>toString</code> overloads for common types.</li>
+            <li><code>escapeHtml</code> used for directory listing output.</li>
+            <li><code>findServerByFd</code> routes epoll events.</li>
+          </ul>
+        </section>
+
+        <section style="--i:4;">
+          <h2>PathUtils</h2>
+          <p>
+            <code>joinPaths</code> normalizes slashes and prevents accidental
+            double separators when building file paths.
+          </p>
+        </section>
+
+        <section style="--i:5;">
+          <h2>FileCache</h2>
+          <p>
+            A small LRU cache for static files, used by GET requests.
+          </p>
+          <ul>
+            <li>Max entries: 100</li>
+            <li>Max file size: 1 MB</li>
+            <li>Max total size: 50 MB</li>
+          </ul>
+        </section>
+
+        <section style="--i:6;">
+          <h2>ParserUtils</h2>
+          <p>
+            Shared helpers for configuration parsing: strict integer parsing,
+            whitespace trimming, status code names, and body size parsing.
+          </p>
+        </section>
+
+        <div class="footer">
+          Utilities live in <code>src/utils</code> and <code>src/config</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

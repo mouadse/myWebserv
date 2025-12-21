@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Request parsing and response building.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>HTTP Parsing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">Request parsing and response building.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a class="active" href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">HTTP</div>
+          <h1>Incremental parsing, strict validation.</h1>
+          <p>
+            <code>HTTPRequest</code> is a state machine that consumes data
+            as it arrives. It supports both content-length bodies and
+            chunked transfer encoding.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Parsing states</h2>
+          <p>
+            The parser moves through <code>START_LINE</code>,
+            <code>HEADERS</code>, <code>BODY</code>, and then either
+            <code>DONE</code> or <code>ERROR</code>.
+          </p>
+          <pre><code>ParseState
+  START_LINE -> HEADERS -> BODY -> DONE
+  ERROR on invalid input</code></pre>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Validation rules</h2>
+          <ul>
+            <li>Allowed methods: GET, POST, DELETE.</li>
+            <li>HTTP version must be <code>HTTP/1.1</code>.</li>
+            <li>Max URI length: 8192 bytes.</li>
+            <li>Max header block: 32 KB.</li>
+            <li>Chunked and Content-Length cannot both be set.</li>
+          </ul>
+          <div class="callout">
+            Request headers are normalized to lowercase keys for lookups.
+          </div>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Body handling</h2>
+          <p>
+            For chunked transfer encoding, the parser tracks chunk size and
+            content using <code>BodyParseState</code>. For fixed bodies,
+            it reads until <code>Content-Length</code> is satisfied.
+          </p>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Responses</h2>
+          <p>
+            <code>HttpResponse</code> builds status lines, headers, and body
+            buffers. <code>setBody</code> automatically updates
+            <code>Content-Length</code>. File bodies can be streamed by
+            setting <code>setFileBody</code>.
+          </p>
+          <pre><code>response.setStatus(200, "OK");
+response.setHeader("Content-Type", "text/html");
+response.setBody("Hello");</code></pre>
+        </section>
+
+        <section style="--i:6;">
+          <h2>Notes on HEAD</h2>
+          <p>
+            <code>RequestHandler</code> treats HEAD like GET and strips the
+            body, but the request parser currently only accepts GET, POST,
+            and DELETE. Supporting HEAD requires updating
+            <code>HTTPRequest</code> validation.
+          </p>
+        </section>
+
+        <div class="footer">
+          HTTP parsing is implemented in <code>src/http/HTTPRequest.cpp</code>
+          and response building in <code>src/http/HTTPResponse.cpp</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

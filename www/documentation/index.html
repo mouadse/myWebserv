@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="C++98 HTTP server, epoll powered, CGI ready.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>Webserv Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">C++98 HTTP server, epoll powered, CGI ready.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a class="active" href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Webserv at a glance</div>
+          <h1>Elegant, deliberate, and small.</h1>
+          <p>
+            This documentation explains the internal parts of the Webserv
+            project, from configuration parsing to CGI execution. It focuses
+            on the real implementation in <code>src/</code>, so you can
+            navigate, extend, or debug with confidence.
+          </p>
+          <p class="badge">C++98 / Non-blocking / epoll</p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Quickstart</h2>
+          <p>Build and run with the default configuration.</p>
+          <pre><code>make
+./webserv
+# or
+./webserv config/demo.conf</code></pre>
+          <p>
+            The default config path is <code>./config/demo.conf</code> as seen
+            in <code>src/main.cpp</code>.
+          </p>
+        </section>
+
+        <section style="--i:3;">
+          <h2>What this server does</h2>
+          <ul>
+            <li>Handles <code>GET</code>, <code>POST</code>, and <code>DELETE</code>.</li>
+            <li>Serves static files with optional autoindex.</li>
+            <li>Streams large files and supports range requests.</li>
+            <li>Parses requests incrementally and supports chunked bodies.</li>
+            <li>Executes CGI scripts with non-blocking pipes and timeouts.</li>
+            <li>Uses a single epoll loop for all sockets.</li>
+          </ul>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Repository layout</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>src/</code></td>
+                <td>All server logic: config, HTTP, CGI, utilities, loop.</td>
+              </tr>
+              <tr>
+                <td><code>config/</code></td>
+                <td>Example server configuration files.</td>
+              </tr>
+              <tr>
+                <td><code>www/</code></td>
+                <td>Static site content and CGI scripts for testing.</td>
+              </tr>
+              <tr>
+                <td><code>rules.md</code></td>
+                <td>Project constraints and allowed syscalls.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Guiding constraints</h2>
+          <div class="callout">
+            Webserv is constrained to C++98, uses no external libraries, and
+            must remain fully non-blocking. All socket I/O is multiplexed
+            through a single epoll loop.
+          </div>
+        </section>
+
+        <div class="footer">
+          Built for clarity. Everything here maps to code in <code>src/</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

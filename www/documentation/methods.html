@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="GET, POST, DELETE in detail.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>HTTP Methods</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">GET, POST, DELETE in detail.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a class="active" href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Methods</div>
+          <h1>Practical implementations, no surprises.</h1>
+          <p>
+            Method handlers live under <code>src/http/Methods</code>. They
+            enforce per-location method restrictions and shape the final
+            response.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>GET</h2>
+          <ul>
+            <li>Resolves the path using <code>root</code> or <code>alias</code>.</li>
+            <li>Serves <code>index</code> for directories when present.</li>
+            <li>Autoindex generates a simple directory listing.</li>
+            <li>Supports byte ranges with <code>Accept-Ranges</code>.</li>
+            <li>Streams large files and caches smaller ones (1 MB max).</li>
+          </ul>
+          <div class="callout">
+            MIME types are mapped by file extension in
+            <code>Get::getMimeType</code>.
+          </div>
+        </section>
+
+        <section style="--i:3;">
+          <h2>POST</h2>
+          <p>
+            The POST handler supports two paths:
+          </p>
+          <ul>
+            <li>
+              Raw body uploads: writes the body to the target path or, if the
+              target is a directory, generates a timestamped filename based
+              on Content-Type.
+            </li>
+            <li>
+              <code>multipart/form-data</code>: extracts one file using the
+              boundary and writes it after filename sanitization.
+            </li>
+          </ul>
+          <p>
+            Successful uploads return <code>201 Created</code> and include a
+            <code>Location</code> header.
+          </p>
+        </section>
+
+        <section style="--i:4;">
+          <h2>DELETE</h2>
+          <ul>
+            <li>Refuses to delete the server root.</li>
+            <li>Uses <code>realpath</code> to avoid path traversal.</li>
+            <li>Prevents deletion of directories.</li>
+            <li>Returns <code>204 No Content</code> on success.</li>
+          </ul>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Method authorization</h2>
+          <p>
+            Each location defines allowed methods. If a method is not allowed,
+            Webserv responds with <code>405</code> and an <code>Allow</code>
+            header built from the location rules.
+          </p>
+          <div class="callout">
+            The request parser currently only accepts GET, POST, and DELETE.
+            HEAD support exists in the handler but is rejected earlier.
+          </div>
+        </section>
+
+        <div class="footer">
+          The method implementations are in
+          <code>src/http/Methods</code> and called by
+          <code>RequestHandler</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

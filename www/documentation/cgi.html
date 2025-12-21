@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="CGI execution and environment.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>CGI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">CGI execution and environment.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a class="active" href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">CGI</div>
+          <h1>Scripts executed safely and asynchronously.</h1>
+          <p>
+            CGI support is implemented in <code>src/cgi/CgiHandler.cpp</code>
+            and coordinated by <code>Server</code>. Scripts are launched only
+            when a location defines <code>cgi_ext</code> and
+            <code>cgi_path</code>.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Routing to CGI</h2>
+          <p>
+            <code>RequestHandler::handleCGI</code> checks the request target
+            against the extension map built in <code>LocationBlock</code>.
+            The script path is resolved using the location root.
+          </p>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Environment variables</h2>
+          <p>The handler sets a compact CGI environment:</p>
+          <ul>
+            <li><code>GATEWAY_INTERFACE</code>, <code>SERVER_PROTOCOL</code></li>
+            <li><code>SERVER_SOFTWARE</code></li>
+            <li><code>REQUEST_METHOD</code>, <code>REQUEST_URI</code></li>
+            <li><code>SCRIPT_FILENAME</code>, <code>SCRIPT_NAME</code></li>
+            <li><code>QUERY_STRING</code></li>
+            <li><code>CONTENT_LENGTH</code>, <code>CONTENT_TYPE</code></li>
+            <li><code>HTTP_COOKIE</code>, <code>HTTP_USER_AGENT</code></li>
+            <li><code>HTTP_ACCEPT</code>, <code>HTTP_HOST</code></li>
+          </ul>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Process model</h2>
+          <p>
+            <code>CgiHandler::spawn</code> forks, connects stdin/stdout to
+            pipes, and execs the interpreter (from config or by extension).
+            The parent uses non-blocking pipes and epoll readiness for I/O.
+          </p>
+          <div class="callout">
+            Default interpreters are mapped by extension (py, pl, php, rb, sh)
+            when no explicit <code>cgi_path</code> is provided.
+          </div>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Timeout and output limits</h2>
+          <ul>
+            <li>Timeout: 5 seconds.</li>
+            <li>Max output buffer: 16 MB.</li>
+            <li>On overflow or failure: <code>502 Bad Gateway</code>.</li>
+            <li>On timeout: <code>504 Gateway Timeout</code>.</li>
+          </ul>
+        </section>
+
+        <section style="--i:6;">
+          <h2>Output parsing</h2>
+          <p>
+            CGI output headers are parsed if present. A <code>Status</code>
+            header sets the response status. If <code>Location</code> is
+            present and no status is set, the response defaults to 302.
+          </p>
+        </section>
+
+        <div class="footer">
+          CGI execution is coordinated inside <code>Server::handleCgiEvent</code>.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

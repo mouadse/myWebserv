@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Configuration grammar and behavior.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>Webserv Configuration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">Configuration grammar and behavior.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a href="architecture.html" style="--i:2;">Architecture</a>
+        <a class="active" href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Configuration</div>
+          <h1>NGINX inspired, strictly validated.</h1>
+          <p>
+            Configuration files are parsed by
+            <code>ServerConfigParser</code>. The parser enforces
+            trailing semicolons, validates paths, and prevents duplicated
+            directives.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Server block directives</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Directive</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>listen</code></td>
+                <td>TCP port to bind.</td>
+              </tr>
+              <tr>
+                <td><code>host</code></td>
+                <td>IPv4 address. <code>localhost</code> maps to <code>0.0.0.0</code>.</td>
+              </tr>
+              <tr>
+                <td><code>server_name</code></td>
+                <td>Optional name (stored, not used for routing).</td>
+              </tr>
+              <tr>
+                <td><code>root</code></td>
+                <td>Document root. Must resolve to a directory.</td>
+              </tr>
+              <tr>
+                <td><code>index</code></td>
+                <td>Default file for directory requests.</td>
+              </tr>
+              <tr>
+                <td><code>client_max_body_size</code></td>
+                <td>Max request body size. Supports M or G suffix.</td>
+              </tr>
+              <tr>
+                <td><code>autoindex</code></td>
+                <td>Enable directory listing when no index file exists.</td>
+              </tr>
+              <tr>
+                <td><code>error_page</code></td>
+                <td>Custom error page path for a status code.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Location directives</h2>
+          <ul>
+            <li><code>allow_methods</code> (also <code>methods</code> and <code>allowed_methods</code>)</li>
+            <li><code>root</code>, <code>index</code>, <code>autoindex</code></li>
+            <li><code>return</code> (simple redirect)</li>
+            <li><code>alias</code> (path remapping)</li>
+            <li><code>client_max_body_size</code></li>
+            <li><code>cgi_ext</code> and <code>cgi_path</code></li>
+          </ul>
+          <div class="callout">
+            The <code>/cgi-bin</code> location is treated specially. It must
+            declare <code>cgi_ext</code>, <code>cgi_path</code>, and
+            <code>index</code>, and it forbids <code>autoindex</code>,
+            <code>alias</code>, and <code>return</code>.
+          </div>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Validation rules</h2>
+          <ul>
+            <li>Every directive must end with a semicolon.</li>
+            <li>Duplicate directives in the same block are rejected.</li>
+            <li>Server blocks cannot share the same host and port.</li>
+            <li>Location paths must begin with <code>/</code>.</li>
+            <li>CGI extensions and paths must be paired 1:1.</li>
+          </ul>
+        </section>
+
+        <section style="--i:5;">
+          <h2>Example snippet</h2>
+          <pre><code>server {
+  listen 8085;
+  host 127.0.0.1;
+  root ./www;
+  index index.html;
+  autoindex on;
+
+  location /upload {
+    allow_methods POST GET DELETE;
+    client_max_body_size 2G;
+  }
+
+  location /cgi-bin {
+    root ./www;
+    cgi_ext .py .sh .pl .rb .php;
+    cgi_path /usr/bin/python3 /bin/bash /usr/bin/perl /usr/bin/ruby /usr/bin/php;
+    index handler.py;
+  }
+}</code></pre>
+        </section>
+
+        <div class="footer">
+          Configuration parsing lives in <code>src/config</code> and is
+          intentionally strict to catch mistakes early.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

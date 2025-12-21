@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Architecture and flow.">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+  <title>Webserv Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/theme.js"></script>
+</head>
+
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div>
+        <div class="site-title">Documentation</div>
+        <div class="title-name">Webserv</div>
+      </div>
+      <div class="site-tagline">Architecture and flow.</div>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-slider">
+          <span class="theme-toggle-icon">☀️</span>
+        </span>
+      </button>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-title">Contents</div>
+        <a href="index.html" style="--i:1;">Overview</a>
+        <a class="active" href="architecture.html" style="--i:2;">Architecture</a>
+        <a href="configuration.html" style="--i:3;">Configuration</a>
+        <a href="request-lifecycle.html" style="--i:4;">Request Lifecycle</a>
+        <a href="http.html" style="--i:5;">HTTP Parsing</a>
+        <a href="methods.html" style="--i:6;">HTTP Methods</a>
+        <a href="cgi.html" style="--i:7;">CGI</a>
+        <a href="server-loop.html" style="--i:8;">Event Loop</a>
+        <a href="utils.html" style="--i:9;">Utilities</a>
+        <a href="errors.html" style="--i:10;">Errors</a>
+        <a href="build-run.html" style="--i:11;">Build and Run</a>
+      </nav>
+
+      <main>
+        <section class="hero" style="--i:1;">
+          <div class="eyebrow">Architecture</div>
+          <h1>Small modules, clean flow.</h1>
+          <p>
+            Webserv is structured around a single event loop, with a clean
+            separation between configuration parsing, request processing,
+            and response streaming. The goal is steady, non-blocking work
+            across all connections.
+          </p>
+        </section>
+
+        <section style="--i:2;">
+          <h2>Startup and configuration</h2>
+          <p>
+            Entry point <code>src/main.cpp</code> parses the configuration
+            file via <code>ServerConfigParser</code>. Each
+            <code>WebserverConfig</code> becomes a <code>Server</code>
+            instance, bound to its host and port.
+          </p>
+          <pre><code>main
+  -> ServerConfigParser::createCluster
+  -> vector&lt;WebserverConfig&gt;
+  -> vector&lt;Server&gt;</code></pre>
+        </section>
+
+        <section style="--i:3;">
+          <h2>Event loop</h2>
+          <p>
+            A singleton <code>EpollManager</code> owns the epoll file
+            descriptor. The loop waits on listening sockets, client sockets,
+            CGI pipes, and the signal pipe.
+          </p>
+          <pre><code>epoll_wait
+  -> acceptClient
+  -> readClient / writeClient
+  -> handleCgiEvent</code></pre>
+        </section>
+
+        <section style="--i:4;">
+          <h2>Request flow</h2>
+          <ol>
+            <li>Socket data is fed into <code>HTTPRequest</code>.</li>
+            <li>When complete, <code>RequestHandler</code> builds a response.</li>
+            <li>File responses are streamed; small files may be cached.</li>
+            <li>Buffers are sent through <code>Server::writeClient</code>.</li>
+          </ol>
+        </section>
+
+        <section style="--i:5;">
+          <h2>CGI flow</h2>
+          <p>
+            If a request targets a configured CGI path, the handler prepares
+            a <code>CgiTask</code>. The server spawns the script, connects
+            pipes, and resumes the epoll loop while the CGI executes.
+          </p>
+          <div class="callout">
+            CGI timeouts are enforced at 5 seconds, with a 16 MB output cap.
+          </div>
+        </section>
+
+        <div class="footer">
+          Modules are designed to be independent: config, HTTP, CGI, and loop
+          logic can evolve without cross-cutting changes.
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>
