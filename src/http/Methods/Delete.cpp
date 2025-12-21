@@ -85,7 +85,7 @@ void Delete::handle(const HTTPRequest &request, HttpResponse &response,
   }
 
   struct stat fileStat;
-  if (lstat(filePath.c_str(), &fileStat) != 0) {
+  if (stat(filePath.c_str(), &fileStat) != 0) {
     if (errno == ENOENT)
       setHtmlError(response, 404, "Not Found", "Target not found.");
     else
