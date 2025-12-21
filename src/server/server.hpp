@@ -40,6 +40,7 @@ public:
   WebserverConfig config;
 
   std::map<int, Client *> clients;
+  std::map<int, Client *> cgiFds;
 
   Server();
   Server(const WebserverConfig &cfg);
@@ -48,4 +49,8 @@ public:
   void writeClient(int fd);
   void closeClient(int fd);
   bool hasClient(int fd) const;
+  bool hasCgiFd(int fd) const;
+  void handleCgiEvent(int fd, uint32_t events);
+  int nextCgiTimeoutMs() const;
+  void checkCgiTimeouts();
 };

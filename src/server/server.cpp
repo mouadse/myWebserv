@@ -11,8 +11,12 @@
 /* ************************************************************************** */
 
 #include "server.hpp"
+#include "../cgi/CgiHandler.hpp"
 #include "client.hpp"
+#include <signal.h>
 #include <sstream>
+#include <sys/time.h>
+#include <sys/wait.h>
 
 namespace {
 void setHtmlError(HttpResponse &response, int code, const std::string &message,
@@ -70,6 +74,175 @@ void logWriteFailure(Client *c, int fd, const char *callName) {
                   "() failed on FD: " + Helpers::toString(fd) +
                   " Error: " + std::string(strerror(errno)));
   }
+}
+
+const long long CGI_TIMEOUT_MS = 5000;
+
+long long nowMs() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return static_cast<long long>(tv.tv_sec) * 1000 +
+         static_cast<long long>(tv.tv_usec) / 1000;
+}
+
+void removeCgiFd(Server &server, int &fd) {
+  if (fd < 0)
+    return;
+  try {
+    EpollManager::getInstance().remove(fd);
+  } catch (...) {
+  }
+  close(fd);
+  server.cgiFds.erase(fd);
+  fd = -1;
+}
+
+void closeCgiInput(Server &server, Client *c) {
+  if (c == NULL)
+    return;
+  removeCgiFd(server, c->cgiInFd);
+  c->cgiInputClosed = true;
+}
+
+void closeCgiOutput(Server &server, Client *c) {
+  if (c == NULL)
+    return;
+  removeCgiFd(server, c->cgiOutFd);
+  c->cgiOutputClosed = true;
+}
+
+void resetCgiState(Client *c) {
+  if (c == NULL)
+    return;
+  c->cgiActive = false;
+  c->cgiPid = -1;
+  c->cgiInFd = -1;
+  c->cgiOutFd = -1;
+  c->cgiInput.clear();
+  c->cgiInputOffset = 0;
+  c->cgiOutput.clear();
+  c->cgiInputClosed = false;
+  c->cgiOutputClosed = false;
+  c->cgiExited = false;
+  c->cgiExitStatus = 0;
+  c->cgiTimedOut = false;
+  c->cgiStripBody = false;
+  c->cgiStartMs = 0;
+}
+
+void updateCgiExitStatus(Client *c) {
+  if (c == NULL || c->cgiExited || c->cgiPid <= 0)
+    return;
+  int status = 0;
+  pid_t ret = waitpid(c->cgiPid, &status, WNOHANG);
+  if (ret == c->cgiPid) {
+    c->cgiExited = true;
+    c->cgiExitStatus = status;
+  }
+}
+
+bool cgiDone(Client *c) {
+  if (c == NULL)
+    return false;
+  return c->cgiOutputClosed && c->cgiExited;
+}
+
+void finalizeCgi(Server &server, Client *c) {
+  if (c == NULL || !c->cgiActive)
+    return;
+
+  if (c->cgiTimedOut) {
+    c->response.setStatus(504, "Gateway Timeout");
+  } else if (!c->cgiExited || WIFSIGNALED(c->cgiExitStatus) ||
+             !WIFEXITED(c->cgiExitStatus) ||
+             WEXITSTATUS(c->cgiExitStatus) != 0) {
+    c->response.setStatus(502, "Bad Gateway");
+  } else {
+    CgiHandler::parseOutput(c->cgiOutput, c->response);
+  }
+
+  if (c->cgiStripBody) {
+    std::string originalLength;
+    try {
+      originalLength = c->response.getHeader("Content-Length");
+    } catch (...) {
+      originalLength.clear();
+    }
+    c->response.setBody("");
+    if (!originalLength.empty())
+      c->response.setHeader("Content-Length", originalLength);
+  }
+
+  c->response.toBuffer(c->writeBuffer);
+  c->wantWrite = true;
+
+  try {
+    EpollManager::getInstance().mod(c->fd, EPOLLOUT | EPOLLRDHUP);
+  } catch (...) {
+  }
+
+  closeCgiInput(server, c);
+  closeCgiOutput(server, c);
+  resetCgiState(c);
+  c->request.reset();
+  c->response = HttpResponse();
+}
+
+bool startCgi(Server &server, Client *c, const CgiTask &task) {
+  if (c == NULL)
+    return false;
+
+  int inFd = -1;
+  int outFd = -1;
+  pid_t pid = -1;
+  CgiHandler handler(c->request, task.scriptPath, task.scriptName,
+                     task.interpreter);
+
+  if (!handler.spawn(inFd, outFd, pid))
+    return false;
+
+  c->cgiActive = true;
+  c->cgiPid = pid;
+  c->cgiInFd = inFd;
+  c->cgiOutFd = outFd;
+  c->cgiInput = c->request.getBody();
+  c->cgiInputOffset = 0;
+  c->cgiOutput.clear();
+  c->cgiInputClosed = false;
+  c->cgiOutputClosed = false;
+  c->cgiExited = false;
+  c->cgiExitStatus = 0;
+  c->cgiTimedOut = false;
+  c->cgiStripBody = task.stripBody;
+  c->cgiStartMs = nowMs();
+
+  try {
+    if (!c->cgiInput.empty()) {
+      EpollManager::getInstance().add(inFd, EPOLLOUT);
+      server.cgiFds[inFd] = c;
+    } else {
+      close(inFd);
+      c->cgiInFd = -1;
+      c->cgiInputClosed = true;
+    }
+
+    EpollManager::getInstance().add(outFd, EPOLLIN);
+    server.cgiFds[outFd] = c;
+  } catch (...) {
+    kill(pid, SIGKILL);
+    updateCgiExitStatus(c);
+    closeCgiInput(server, c);
+    closeCgiOutput(server, c);
+    resetCgiState(c);
+    return false;
+  }
+
+  try {
+    EpollManager::getInstance().mod(c->fd, EPOLLRDHUP);
+  } catch (...) {
+  }
+
+  return true;
 }
 } // namespace
 
@@ -247,6 +420,8 @@ void Server::readClient(int fd) {
     return;
   }
   Client *c = it->second;
+  if (c->cgiActive)
+    return;
   char buf[16384];
 
   ssize_t n = read(fd, buf, sizeof(buf));
@@ -260,7 +435,20 @@ void Server::readClient(int fd) {
       if (Logger::isDebugEnabled())
         Logger::debug("Request complete on FD: " + Helpers::toString(fd));
       RequestHandler handler(config);
-      handler.process(c->request, c->response);
+      CgiTask cgiTask;
+      bool cgiPending = handler.process(c->request, c->response, cgiTask);
+      if (cgiPending) {
+        if (!startCgi(*this, c, cgiTask)) {
+          c->response.setStatus(500, "Internal Server Error");
+        } else {
+          std::string conn = c->request.getHeader("connection");
+          if (conn == "close")
+            c->closeAfterWrite = true;
+          c->request.reset();
+          break;
+        }
+      }
+
       if (c->response.hasFileBody() && c->response.getFileLength() > 0) {
         if (!startFileStream(c, c->response)) {
           setHtmlError(c->response, 500, "Internal Server Error",
@@ -304,6 +492,106 @@ void Server::readClient(int fd) {
     Logger::error("read() failed on FD: " + Helpers::toString(fd) +
                   " Error: " + std::string(strerror(errno)));
     closeClient(fd);
+  }
+}
+
+bool Server::hasCgiFd(int fd) const {
+  return cgiFds.find(fd) != cgiFds.end();
+}
+
+void Server::handleCgiEvent(int fd, uint32_t events) {
+  std::map<int, Client *>::iterator it = cgiFds.find(fd);
+  if (it == cgiFds.end() || it->second == NULL)
+    return;
+
+  Client *c = it->second;
+  if (!c->cgiActive)
+    return;
+
+  if (fd == c->cgiInFd) {
+    if (events & (EPOLLERR | EPOLLHUP)) {
+      closeCgiInput(*this, c);
+    } else if (events & EPOLLOUT) {
+      if (c->cgiInputOffset < c->cgiInput.size()) {
+        const char *dataPtr = c->cgiInput.empty() ? NULL : &c->cgiInput[0];
+        ssize_t w = write(c->cgiInFd, dataPtr + c->cgiInputOffset,
+                          c->cgiInput.size() - c->cgiInputOffset);
+        if (w > 0) {
+          c->cgiInputOffset += static_cast<size_t>(w);
+        } else {
+          closeCgiInput(*this, c);
+        }
+      }
+      if (c->cgiInputOffset >= c->cgiInput.size())
+        closeCgiInput(*this, c);
+    }
+  }
+
+  if (fd == c->cgiOutFd) {
+    if (events & EPOLLIN) {
+      char buffer[4096];
+      ssize_t r = read(c->cgiOutFd, buffer, sizeof(buffer));
+      if (r > 0) {
+        c->cgiOutput.insert(c->cgiOutput.end(), buffer, buffer + r);
+      } else if (r == 0) {
+        closeCgiOutput(*this, c);
+      } else {
+        closeCgiOutput(*this, c);
+      }
+    }
+    if (events & (EPOLLHUP | EPOLLERR))
+      closeCgiOutput(*this, c);
+  }
+
+  updateCgiExitStatus(c);
+  if (cgiDone(c))
+    finalizeCgi(*this, c);
+}
+
+int Server::nextCgiTimeoutMs() const {
+  long long now = nowMs();
+  long long minRemaining = -1;
+
+  for (std::map<int, Client *>::const_iterator it = clients.begin();
+       it != clients.end(); ++it) {
+    Client *c = it->second;
+    if (c == NULL || !c->cgiActive)
+      continue;
+    long long elapsed = now - c->cgiStartMs;
+    long long remaining = CGI_TIMEOUT_MS - elapsed;
+    if (remaining < 0)
+      remaining = 0;
+    if (minRemaining < 0 || remaining < minRemaining)
+      minRemaining = remaining;
+  }
+
+  if (minRemaining < 0)
+    return -1;
+  return static_cast<int>(minRemaining);
+}
+
+void Server::checkCgiTimeouts() {
+  long long now = nowMs();
+
+  for (std::map<int, Client *>::iterator it = clients.begin();
+       it != clients.end(); ++it) {
+    Client *c = it->second;
+    if (c == NULL || !c->cgiActive)
+      continue;
+
+    if (!c->cgiTimedOut && now - c->cgiStartMs >= CGI_TIMEOUT_MS) {
+      c->cgiTimedOut = true;
+      if (c->cgiPid > 0)
+        kill(c->cgiPid, SIGKILL);
+    }
+
+    updateCgiExitStatus(c);
+
+    if (c->cgiTimedOut) {
+      finalizeCgi(*this, c);
+    } else if (cgiDone(c)) {
+      finalizeCgi(*this, c);
+    }
   }
 }
 
@@ -437,6 +725,12 @@ void Server::closeClient(int fd) {
     Client *c = clients[fd];
     if (c->streamFd >= 0)
       stopFileStream(c);
+    if (c->cgiPid > 0)
+      kill(c->cgiPid, SIGKILL);
+    updateCgiExitStatus(c);
+    closeCgiInput(*this, c);
+    closeCgiOutput(*this, c);
+    resetCgiState(c);
     delete c;
     clients.erase(fd);
     if (Logger::isDebugEnabled())

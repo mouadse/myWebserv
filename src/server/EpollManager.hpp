@@ -39,7 +39,7 @@ public:
   void add(int fd, uint32_t events);
   void mod(int fd, uint32_t events);
   void remove(int fd);
-  int wait(epoll_event *events, int maxEvents);
+  int wait(epoll_event *events, int maxEvents, int timeoutMs = -1);
 };
 
 #endif

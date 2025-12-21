@@ -129,16 +129,8 @@ void SignalHandling::consume() {
 
 static void closeClientNoThrow(Server &server, int fd) {
   try {
-    EpollManager::getInstance().remove(fd);
+    server.closeClient(fd);
   } catch (...) {
-  }
-
-  if (fd >= 0)
-    ::close(fd);
-
-  if (server.clients.count(fd)) {
-    delete server.clients[fd];
-    server.clients.erase(fd);
   }
 }
 

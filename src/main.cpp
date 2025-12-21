@@ -66,9 +66,15 @@ static void runServer(std::vector<Server> &servers) {
 
   bool running = true;
   while (running) {
-    int n = ep.wait(events, 64);
-    if (n == 0)
-      continue;
+    int timeoutMs = -1;
+    for (size_t s = 0; s < servers.size(); ++s) {
+      int serverTimeout = servers[s].nextCgiTimeoutMs();
+      if (serverTimeout >= 0 && (timeoutMs < 0 || serverTimeout < timeoutMs)) {
+        timeoutMs = serverTimeout;
+      }
+    }
+
+    int n = ep.wait(events, 64, timeoutMs);
     if (n < 0) {
       if (errno == EINTR)
         continue;
@@ -77,47 +83,58 @@ static void runServer(std::vector<Server> &servers) {
       break;
     }
 
-    for (int i = 0; i < n; i++) {
-      int fd = events[i].data.fd;
+    if (n > 0) {
+      for (int i = 0; i < n; i++) {
+        int fd = events[i].data.fd;
 
-      if (fd == signals.getReadFd()) {
-        signals.consume();
-        Logger::warn("Stop requested (signal " +
-                     Helpers::toString(signals.lastSignal()) + ")");
-        running = false;
-        break;
-      }
+        if (fd == signals.getReadFd()) {
+          signals.consume();
+          Logger::warn("Stop requested (signal " +
+                       Helpers::toString(signals.lastSignal()) + ")");
+          running = false;
+          break;
+        }
 
-      Helpers::FdInfo info = Helpers::findServerByFd(fd, servers);
+        Helpers::FdInfo info = Helpers::findServerByFd(fd, servers);
 
-      if (info.serverIndex < 0) {
-        Logger::warn("Received event for unknown fd: " + Helpers::toString(fd));
-        continue;
-      }
-
-      Server &server = servers[info.serverIndex];
-
-      if (info.type == 0) {
-        server.acceptClient();
-      } else if (info.type == 1) {
-        if (events[i].events & (EPOLLHUP | EPOLLERR)) {
-          server.closeClient(fd);
+        if (info.serverIndex < 0) {
+          Logger::warn("Received event for unknown fd: " +
+                       Helpers::toString(fd));
           continue;
         }
-        if (events[i].events & EPOLLRDHUP) {
-          server.readClient(fd);
-          if (server.hasClient(fd))
+
+        Server &server = servers[info.serverIndex];
+
+        if (info.type == 0) {
+          server.acceptClient();
+        } else if (info.type == 1) {
+          if (events[i].events & (EPOLLHUP | EPOLLERR)) {
             server.closeClient(fd);
-          continue;
-        }
-        if (events[i].events & EPOLLIN) {
-          server.readClient(fd);
-        }
-        if ((events[i].events & EPOLLOUT) && server.hasClient(fd)) {
-          server.writeClient(fd);
+            continue;
+          }
+          if (events[i].events & EPOLLRDHUP) {
+            server.readClient(fd);
+            if (server.hasClient(fd))
+              server.closeClient(fd);
+            continue;
+          }
+          if (events[i].events & EPOLLIN) {
+            server.readClient(fd);
+          }
+          if ((events[i].events & EPOLLOUT) && server.hasClient(fd)) {
+            server.writeClient(fd);
+          }
+        } else if (info.type == 2) {
+          server.handleCgiEvent(fd, events[i].events);
         }
       }
     }
+
+    for (size_t s = 0; s < servers.size(); ++s)
+      servers[s].checkCgiTimeouts();
+
+    if (n == 0)
+      continue;
   }
 
   signals.uninstall();
@@ -125,7 +142,7 @@ static void runServer(std::vector<Server> &servers) {
 }
 
 int main(int argc, char **argv) {
-  Logger::getInstance().enableDebugMode(); // enabling debuging mode
+  // Logger::getInstance().enableDebugMode(); // enabling debuging mode
   std::vector<Server> servers;
 
   try {

@@ -17,6 +17,7 @@
 #include <iostream>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "../http/HTTPRequest.hpp"
@@ -41,6 +42,20 @@ public:
   std::vector<char> streamBuffer;
   size_t streamBufferOffset;
   size_t streamBufferSize;
+  bool cgiActive;
+  pid_t cgiPid;
+  int cgiInFd;
+  int cgiOutFd;
+  std::vector<char> cgiInput;
+  size_t cgiInputOffset;
+  std::vector<char> cgiOutput;
+  bool cgiInputClosed;
+  bool cgiOutputClosed;
+  bool cgiExited;
+  int cgiExitStatus;
+  bool cgiTimedOut;
+  bool cgiStripBody;
+  long long cgiStartMs;
   Client(int fd);
 };
 

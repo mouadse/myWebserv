@@ -26,12 +26,23 @@
 #include <unistd.h>
 #include <vector>
 
+struct CgiTask {
+  bool active;
+  bool stripBody;
+  std::string scriptPath;
+  std::string scriptName;
+  std::string interpreter;
+
+  CgiTask() : active(false), stripBody(false) {}
+};
+
 class RequestHandler {
 private:
   void handleGET(const HTTPRequest &request, HttpResponse &response);
   void handlePOST(const HTTPRequest &request, HttpResponse &response);
   void handleDELETE(const HTTPRequest &request, HttpResponse &response);
-  void handleCGI(const HTTPRequest &request, HttpResponse &response);
+  bool handleCGI(const HTTPRequest &request, HttpResponse &response,
+                 CgiTask &cgiTask);
   void setCommonHeaders(HttpResponse &response);
   void handleError(int errorCode, const std::string &errorMessage,
                    HttpResponse &response);
@@ -44,7 +55,8 @@ private:
 public:
   RequestHandler();
   RequestHandler(const WebserverConfig &srv);
-  void process(const HTTPRequest &request, HttpResponse &response);
+  bool process(const HTTPRequest &request, HttpResponse &response,
+               CgiTask &cgiTask);
   const LocationBlock &matchLocation(const std::string &path);
 };
 

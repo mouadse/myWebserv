@@ -200,7 +200,7 @@ void EpollManager::remove(int fd) {
                   " from epoll (FD: " + Helpers::toString(epfd) + ")");
 }
 
-int EpollManager::wait(epoll_event *events, int maxEvents) {
+int EpollManager::wait(epoll_event *events, int maxEvents, int timeoutMs) {
   if (Logger::isDebugEnabled())
     Logger::debug("EpollManager::wait() called - maxEvents: " +
                   Helpers::toString(maxEvents));
@@ -210,7 +210,7 @@ int EpollManager::wait(epoll_event *events, int maxEvents) {
     return -1;
   }
 
-  int ready = epoll_wait(epfd, events, maxEvents, -1);
+  int ready = epoll_wait(epfd, events, maxEvents, timeoutMs);
   if (Logger::isDebugEnabled())
     Logger::debug("epoll_wait() returned " + Helpers::toString(ready) +
                   " ready events");

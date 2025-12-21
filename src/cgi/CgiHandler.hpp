@@ -5,6 +5,7 @@
 #include "../http/HTTPResponse.hpp"
 #include <map>
 #include <string>
+#include <sys/types.h>
 #include <unistd.h>
 #include <vector>
 
@@ -14,7 +15,9 @@ public:
              const std::string &scriptName, const std::string &interpreter);
   ~CgiHandler();
 
-  void execute(HttpResponse &response);
+  bool spawn(int &inWriteFd, int &outReadFd, pid_t &pid) const;
+  static void parseOutput(const std::vector<char> &output,
+                          HttpResponse &response);
 
 private:
   const HTTPRequest &_request;

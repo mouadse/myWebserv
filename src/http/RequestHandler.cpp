@@ -12,7 +12,6 @@
 /* ************************************************************************** */
 
 #include "RequestHandler.hpp"
-#include "../cgi/CgiHandler.hpp"
 #include "../utils/PathUtils.hpp"
 #include "Methods/Delete.hpp"
 #include "Methods/Get.hpp"
@@ -57,10 +56,11 @@ void RequestHandler::respondMethodNotAllowed(const LocationBlock &location,
   handleError(405, "Method Not Allowed", response);
 }
 
-void RequestHandler::process(const HTTPRequest &request,
-                             HttpResponse &response) {
+bool RequestHandler::process(const HTTPRequest &request, HttpResponse &response,
+                             CgiTask &cgiTask) {
   response = HttpResponse();
   response.setBody("");
+  cgiTask = CgiTask();
   const std::string method = request.getMethod();
   const std::string target = request.getTarget();
   const LocationBlock &location = matchLocation(target);
@@ -82,13 +82,13 @@ void RequestHandler::process(const HTTPRequest &request,
     else if (msg == "Unsupported HTTP version")
       code = 505;
     handleError(code, msg, response);
-    return;
+    return false;
   }
 
   if (isAdminPath(target) && request.getHeader("Authorization").empty()) {
     response.setHeader("WWW-Authenticate", "Basic realm=\"webserv\"");
     handleError(401, "Unauthorized", response);
-    return;
+    return false;
   }
 
   const std::string &redirectTarget = location.getReturn();
@@ -96,7 +96,7 @@ void RequestHandler::process(const HTTPRequest &request,
     response.setStatus(302, "Found");
     response.setHeader("Location", redirectTarget);
     response.setBody("");
-    return;
+    return false;
   }
 
   bool stripBody = false;
@@ -105,15 +105,21 @@ void RequestHandler::process(const HTTPRequest &request,
   }
 
   if (method == "GET" || method == "HEAD") {
-    if (isCGI)
-      handleCGI(request, response);
-    else
+    if (isCGI) {
+      if (handleCGI(request, response, cgiTask)) {
+        cgiTask.stripBody = stripBody;
+        return true;
+      }
+    } else {
       handleGET(request, response);
+    }
   } else if (method == "POST") {
-    if (isCGI)
-      handleCGI(request, response);
-    else
+    if (isCGI) {
+      if (handleCGI(request, response, cgiTask))
+        return true;
+    } else {
       handlePOST(request, response);
+    }
   } else if (method == "DELETE") {
     handleDELETE(request, response);
   } else {
@@ -125,6 +131,7 @@ void RequestHandler::process(const HTTPRequest &request,
     response.setBody("");
     response.setHeader("Content-Length", originalLength);
   }
+  return false;
 }
 
 void RequestHandler::setCommonHeaders(HttpResponse &response) {
@@ -178,14 +185,14 @@ void RequestHandler::handlePOST(const HTTPRequest &request,
   Post::handle(request, response, location);
 }
 
-void RequestHandler::handleCGI(const HTTPRequest &request,
-                               HttpResponse &response) {
+bool RequestHandler::handleCGI(const HTTPRequest &request,
+                               HttpResponse &response, CgiTask &cgiTask) {
   const LocationBlock &location = matchLocation(request.getTarget());
   const std::map<std::string, std::string> &cgiMap =
       location.getExtensionToCgiMap();
   if (cgiMap.empty()) {
     handleError(404, "Not Found", response);
-    return;
+    return false;
   }
 
   std::string scriptUri = request.getTarget();
@@ -193,7 +200,7 @@ void RequestHandler::handleCGI(const HTTPRequest &request,
       (!scriptUri.empty() && scriptUri[scriptUri.size() - 1] == '/')) {
     if (location.getIndex().empty()) {
       handleError(404, "Not Found", response);
-      return;
+      return false;
     }
     scriptUri = joinPaths(location.getPath(), location.getIndex());
   }
@@ -202,7 +209,7 @@ void RequestHandler::handleCGI(const HTTPRequest &request,
   std::map<std::string, std::string>::const_iterator it = cgiMap.find(ext);
   if (ext.empty() || it == cgiMap.end()) {
     handleError(404, "Not Found", response);
-    return;
+    return false;
   }
 
   const std::string scriptPath = joinPaths(location.getRoot(), scriptUri);
@@ -212,23 +219,26 @@ void RequestHandler::handleCGI(const HTTPRequest &request,
       handleError(404, "Not Found", response);
     else
       handleError(403, "Forbidden", response);
-    return;
+    return false;
   }
   if (S_ISDIR(st.st_mode)) {
     handleError(404, "Not Found", response);
-    return;
+    return false;
   }
   if (access(scriptPath.c_str(), R_OK) != 0) {
     handleError(403, "Forbidden", response);
-    return;
+    return false;
   }
   if (!it->second.empty() && access(it->second.c_str(), X_OK) != 0) {
     handleError(500, "Internal Server Error", response);
-    return;
+    return false;
   }
 
-  CgiHandler cgi(request, scriptPath, scriptUri, it->second);
-  cgi.execute(response);
+  cgiTask.active = true;
+  cgiTask.scriptPath = scriptPath;
+  cgiTask.scriptName = scriptUri;
+  cgiTask.interpreter = it->second;
+  return true;
 }
 
 void RequestHandler::handleDELETE(const HTTPRequest &request,

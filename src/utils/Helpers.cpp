@@ -46,6 +46,14 @@ Helpers::FdInfo Helpers::findServerByFd(int fd,
     }
   }
 
+  for (size_t i = 0; i < servers.size(); ++i) {
+    if (servers[i].hasCgiFd(fd)) {
+      result.serverIndex = i;
+      result.type = 2;
+      return result;
+    }
+  }
+
   result.serverIndex = -1;
   result.type = -1;
   return result;

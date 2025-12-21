@@ -1,5 +1,4 @@
 # ---------- toolchain ----------
-UNAME_S := $(shell uname -s)
 CCACHE := $(shell command -v ccache 2>/dev/null)
 ifeq ($(CCACHE),)
 CXX := c++
@@ -11,23 +10,14 @@ endif
 MAKEFLAGS += -j$(shell nproc)
 
 # ---------- flags ----------
-CXXFLAGS_COMMON = -Wall -Wextra -Werror -std=c++98 -I./src
+BASE_CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I./src
 DEPFLAGS      = -MMD -MP
-
-ifeq ($(UNAME_S),Linux)
-	CXXFLAGS_DEV = $(CXXFLAGS_COMMON) -g3 -Wpedantic -Wcast-align -Wcast-qual -Wunused \
-		-Woverloaded-virtual -Wmisleading-indentation -Wnon-virtual-dtor\
-		-fstack-protector-strong -fstrict-overflow
-endif
-
-# Production Flags
-CXXFLAGS_PROD = $(CXXFLAGS_COMMON) -O3 -march=native -flto -fstack-protector-strong -D_FORTIFY_SOURCE=2
 
 DEBUG ?= 0
 ifeq ($(DEBUG),1)
-	CXXFLAGS = $(CXXFLAGS_DEV) -fsanitize=address
+	CXXFLAGS = $(BASE_CXXFLAGS) -g -O0 -fsanitize=address
 else
-	CXXFLAGS = $(CXXFLAGS_PROD)
+	CXXFLAGS = $(BASE_CXXFLAGS) -O2
 endif
 
 # ---------- sources ----------
