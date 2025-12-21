@@ -54,6 +54,7 @@ public:
   bool cgiExited;
   int cgiExitStatus;
   bool cgiTimedOut;
+  bool cgiOutputOverflow;
   bool cgiStripBody;
   long long cgiStartMs;
   Client(int fd);

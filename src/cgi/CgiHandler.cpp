@@ -1,5 +1,6 @@
 #include "CgiHandler.hpp"
 #include <cstring>
+#include <fcntl.h>
 #include <sstream>
 #include <unistd.h>
 #include <vector>
@@ -154,6 +155,16 @@ bool CgiHandler::spawn(int &inWriteFd, int &outReadFd, pid_t &pid) const {
 
   close(pipeIn[0]);
   close(pipeOut[1]);
+
+  // Set non-blocking mode on parent-side pipe FDs (rules.md: fcntl with
+  // F_SETFL, O_NONBLOCK allowed)
+  fcntl(pipeIn[1], F_SETFL, O_NONBLOCK);
+  fcntl(pipeOut[0], F_SETFL, O_NONBLOCK);
+
+  // Close-on-exec to prevent leaking FDs if CGI forks again (rules.md:
+  // FD_CLOEXEC allowed)
+  fcntl(pipeIn[1], F_SETFD, FD_CLOEXEC);
+  fcntl(pipeOut[0], F_SETFD, FD_CLOEXEC);
 
   inWriteFd = pipeIn[1];
   outReadFd = pipeOut[0];

@@ -142,7 +142,7 @@ static void runServer(std::vector<Server> &servers) {
 }
 
 int main(int argc, char **argv) {
-  // Logger::getInstance().enableDebugMode(); // enabling debuging mode
+  Logger::getInstance().enableDebugMode(); // enabling debuging mode
   std::vector<Server> servers;
 
   try {

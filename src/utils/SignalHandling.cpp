@@ -97,6 +97,14 @@ void SignalHandling::uninstall() {
   ::signal(SIGQUIT, _oldQuit);
   ::signal(SIGPIPE, _oldPipe);
 
+  // Remove signal pipe from epoll before closing (clean practice)
+  if (_pipeRead >= 0) {
+    try {
+      EpollManager::getInstance().remove(_pipeRead);
+    } catch (...) {
+    }
+  }
+
   s_writeFd = -1;
   safeCloseFd(_pipeRead);
   safeCloseFd(_pipeWrite);

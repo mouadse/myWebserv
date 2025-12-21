@@ -76,7 +76,8 @@ void logWriteFailure(Client *c, int fd, const char *callName) {
   }
 }
 
-const long long CGI_TIMEOUT_MS = 5000;
+const long long CGI_TIMEOUT_MS = 5000; // 5 second timeout for CGI execution
+const size_t CGI_MAX_OUTPUT = 16 * 1024 * 1024; // 16 MB max CGI output buffer
 
 long long nowMs() {
   struct timeval tv;
@@ -126,6 +127,7 @@ void resetCgiState(Client *c) {
   c->cgiExited = false;
   c->cgiExitStatus = 0;
   c->cgiTimedOut = false;
+  c->cgiOutputOverflow = false;
   c->cgiStripBody = false;
   c->cgiStartMs = 0;
 }
@@ -151,7 +153,29 @@ void finalizeCgi(Server &server, Client *c) {
   if (c == NULL || !c->cgiActive)
     return;
 
-  if (c->cgiTimedOut) {
+  // Drain any remaining output from the pipe (non-blocking read until empty)
+  if (c->cgiOutFd >= 0) {
+    char drain[4096];
+    while (true) {
+      ssize_t r = read(c->cgiOutFd, drain, sizeof(drain));
+      if (r > 0) {
+        if (c->cgiOutput.size() + static_cast<size_t>(r) <= CGI_MAX_OUTPUT) {
+          c->cgiOutput.insert(c->cgiOutput.end(), drain, drain + r);
+        } else {
+          c->cgiOutputOverflow = true;
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  if (c->cgiOutputOverflow) {
+    setHtmlError(
+        c->response, 502, "Bad Gateway",
+        "CGI script produced too much output (exceeded buffer limit).");
+  } else if (c->cgiTimedOut) {
     c->response.setStatus(504, "Gateway Timeout");
   } else if (!c->cgiExited || WIFSIGNALED(c->cgiExitStatus) ||
              !WIFEXITED(c->cgiExitStatus) ||
@@ -495,9 +519,7 @@ void Server::readClient(int fd) {
   }
 }
 
-bool Server::hasCgiFd(int fd) const {
-  return cgiFds.find(fd) != cgiFds.end();
-}
+bool Server::hasCgiFd(int fd) const { return cgiFds.find(fd) != cgiFds.end(); }
 
 void Server::handleCgiEvent(int fd, uint32_t events) {
   std::map<int, Client *>::iterator it = cgiFds.find(fd);
@@ -518,9 +540,12 @@ void Server::handleCgiEvent(int fd, uint32_t events) {
                           c->cgiInput.size() - c->cgiInputOffset);
         if (w > 0) {
           c->cgiInputOffset += static_cast<size_t>(w);
-        } else {
+        } else if (w == 0) {
+          // Zero-byte write is unusual, close the pipe
           closeCgiInput(*this, c);
         }
+        // On w < 0: wait for next EPOLLOUT or EPOLLERR (non-blocking, no errno
+        // check)
       }
       if (c->cgiInputOffset >= c->cgiInput.size())
         closeCgiInput(*this, c);
@@ -532,7 +557,15 @@ void Server::handleCgiEvent(int fd, uint32_t events) {
       char buffer[4096];
       ssize_t r = read(c->cgiOutFd, buffer, sizeof(buffer));
       if (r > 0) {
-        c->cgiOutput.insert(c->cgiOutput.end(), buffer, buffer + r);
+        // Enforce output buffer cap to prevent memory exhaustion
+        if (c->cgiOutput.size() + static_cast<size_t>(r) > CGI_MAX_OUTPUT) {
+          c->cgiOutputOverflow = true;
+          if (c->cgiPid > 0)
+            kill(c->cgiPid, SIGKILL);
+          closeCgiOutput(*this, c);
+        } else {
+          c->cgiOutput.insert(c->cgiOutput.end(), buffer, buffer + r);
+        }
       } else if (r == 0) {
         closeCgiOutput(*this, c);
       } else {

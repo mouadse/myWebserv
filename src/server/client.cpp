@@ -13,27 +13,12 @@
 #include "client.hpp"
 
 Client::Client(int fd)
-    : fd(fd),
-      writeOffset(0),
-      wantWrite(false),
-      closeAfterWrite(false),
-      fileResponse(false),
-      streaming(false),
-      streamFd(-1),
-      streamRemaining(0),
-      streamBufferOffset(0),
-      streamBufferSize(0),
-      cgiActive(false),
-      cgiPid(-1),
-      cgiInFd(-1),
-      cgiOutFd(-1),
-      cgiInputOffset(0),
-      cgiInputClosed(false),
-      cgiOutputClosed(false),
-      cgiExited(false),
-      cgiExitStatus(0),
-      cgiTimedOut(false),
-      cgiStripBody(false),
+    : fd(fd), writeOffset(0), wantWrite(false), closeAfterWrite(false),
+      fileResponse(false), streaming(false), streamFd(-1), streamRemaining(0),
+      streamBufferOffset(0), streamBufferSize(0), cgiActive(false), cgiPid(-1),
+      cgiInFd(-1), cgiOutFd(-1), cgiInputOffset(0), cgiInputClosed(false),
+      cgiOutputClosed(false), cgiExited(false), cgiExitStatus(0),
+      cgiTimedOut(false), cgiOutputOverflow(false), cgiStripBody(false),
       cgiStartMs(0) {
   if (Logger::isDebugEnabled())
     Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
@@ -47,7 +32,7 @@ Client::Client(int fd)
     Logger::debug("Client FD set to: " + Helpers::toString(this->fd));
 
   this->streamBuffer.resize(STREAM_CHUNK_SIZE);
-  
+
   if (Logger::isDebugEnabled())
     Logger::debug("Client state initialized");
 
