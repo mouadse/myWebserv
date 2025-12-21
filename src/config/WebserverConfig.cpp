@@ -249,21 +249,9 @@ void WebserverConfig::setLocationBlocks(
         if (parameters[i].find(';') != std::string::npos) {
           std::string value = parameters[i];
           value = normalizeDirective(value, "cgi_path");
-          if (value.find("/python") == std::string::npos &&
-              value.find("/bash") == std::string::npos &&
-              value.find("/perl") == std::string::npos &&
-              value.find("/ruby") == std::string::npos &&
-              value.find("/php") == std::string::npos)
-            throw std::runtime_error("cgi_path is invalid");
           paths_list.push_back(value);
           break;
         } else {
-          if (parameters[i].find("/python") == std::string::npos &&
-              parameters[i].find("/bash") == std::string::npos &&
-              parameters[i].find("/perl") == std::string::npos &&
-              parameters[i].find("/ruby") == std::string::npos &&
-              parameters[i].find("/php") == std::string::npos)
-            throw std::runtime_error("cgi_path is invalid");
           paths_list.push_back(parameters[i]);
           if (i + 1 >= parameters.size())
             throw std::runtime_error("Token is invalid");

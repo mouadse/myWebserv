@@ -17,25 +17,7 @@ CgiHandler::CgiHandler(const HTTPRequest &request,
 CgiHandler::~CgiHandler() {}
 
 std::string CgiHandler::_getInterpreter() const {
-  if (!_interpreter.empty())
-    return _interpreter;
-
-  size_t dotPos = _scriptPath.find_last_of('.');
-  if (dotPos == std::string::npos)
-    return "";
-
-  std::string ext = _scriptPath.substr(dotPos);
-  if (ext == ".py")
-    return "/usr/bin/python3";
-  if (ext == ".pl")
-    return "/usr/bin/perl";
-  if (ext == ".php")
-    return "/usr/bin/php";
-  if (ext == ".rb")
-    return "/usr/bin/ruby";
-  if (ext == ".sh")
-    return "/bin/bash";
-  return "";
+  return _interpreter;
 }
 
 void CgiHandler::_initEnv() {
