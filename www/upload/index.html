@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Test</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #e1e4e8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .upload-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .upload-card:hover {
+            transform: translateY(-2px);
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 24px;
+            font-size: 24px;
+            color: var(--text-color);
+        }
+
+        .file-drop-area {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            width: 100%;
+            max-width: 100%;
+            padding: 30px 20px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            transition: 0.2s;
+            cursor: pointer;
+            box-sizing: border-box;
+            background-color: #fafbfc;
+        }
+
+        .file-drop-area.is-active {
+            background-color: rgba(74, 144, 226, 0.05);
+            border-color: var(--primary-color);
+        }
+
+        .fake-btn {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            pointer-events: none;
+        }
+
+        .file-msg {
+            font-size: 14px;
+            color: #777;
+            pointer-events: none;
+        }
+
+        .file-input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        .upload-btn:hover {
+            background-color: #357abd;
+        }
+
+        .upload-btn:disabled {
+            background-color: #a0c4eb;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success {
+            background-color: rgba(46, 204, 113, 0.15);
+            color: var(--success-color);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .error {
+            background-color: rgba(231, 76, 60, 0.15);
+            color: var(--error-color);
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            background-color: #e1e4e8;
+            border-radius: 4px;
+            margin-top: 20px;
+            height: 6px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="upload-card">
+        <h1>Upload File</h1>
+        
+        <form id="uploadForm">
+            <div class="file-drop-area" id="dropArea">
+                <span class="fake-btn">Choose file</span>
+                <span class="file-msg">or drag and drop here</span>
+                <input class="file-input" type="file" name="file" id="fileInput" required>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+
+            <div id="status"></div>
+
+            <button type="submit" class="upload-btn" id="submitBtn">Upload Now</button>
+        </form>
+
+        <div id="fileListSection" style="display: none; margin-top: 25px; border-top: 1px solid #e1e4e8; padding-top: 20px;">
+            <h3 style="margin-top: 0; font-size: 18px; color: var(--text-color); text-align: left;">Uploaded Files</h3>
+            <ul id="fileList" style="list-style: none; padding: 0; margin: 0; text-align: left;"></ul>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const dropArea = document.getElementById('dropArea');
+        const fileMsg = document.querySelector('.file-msg');
+        const statusDiv = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+
+        // Drag and drop visual effects
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('is-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('is-active'), false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+            updateFileName();
+        }
+
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            const files = fileInput.files;
+            if (files.length > 0) {
+                fileMsg.textContent = files[0].name;
+            } else {
+                fileMsg.textContent = "or drag and drop here";
+            }
+        }
+
+        // Form Submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const files = fileInput.files;
+            if (files.length === 0) return;
+
+            uploadFile(files[0]);
+        });
+
+        function uploadFile(file) {
+            let url = window.location.href;
+            if (url.endsWith('index.html')) {
+                url = url.substring(0, url.lastIndexOf('/') + 1);
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Reset UI
+            statusDiv.style.display = 'none';
+            statusDiv.className = '';
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+
+            // Progress tracking
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percentComplete + '%';
+                }
+            });
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    showStatus('File uploaded successfully!', 'success');
+                    loadFiles();
+                } else {
+                    showStatus(`Upload failed: ${xhr.status} ${xhr.statusText}`, 'error');
+                }
+                resetBtn();
+            };
+
+            xhr.onerror = () => {
+                showStatus('Network error occurred during upload.', 'error');
+                resetBtn();
+            };
+
+            xhr.send(formData);
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+            statusDiv.style.display = 'block';
+        }
+
+        function resetBtn() {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Upload Now';
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                progressBar.style.width = '0%';
+            }, 1000);
+        }
+
+        const fileListSection = document.getElementById('fileListSection');
+        const fileList = document.getElementById('fileList');
+
+        function loadFiles() {
+            fetch('./')
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to fetch file list');
+                    return res.text();
+                })
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    // If we get the upload page itself, stop
+                    if (doc.querySelector('title')?.textContent === document.title) return;
+
+                    const links = Array.from(doc.querySelectorAll('a'))
+                        .filter(a => {
+                            const href = a.getAttribute('href');
+                            return href && 
+                                   href !== '../' && 
+                                   href !== 'index.html' && 
+                                   !href.startsWith('?');
+                        });
+
+                    if (links.length > 0) {
+                        fileList.innerHTML = links.map(a => {
+                            const href = a.getAttribute('href');
+                            const name = a.textContent.trim() || href;
+                            return `<li style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                                <a href="${href}" target="_blank" style="text-decoration: none; color: var(--primary-color);">${name}</a>
+                            </li>`;
+                        }).join('');
+                        fileListSection.style.display = 'block';
+                    } else {
+                        fileListSection.style.display = 'none';
+                    }
+                })
+                .catch(console.error);
+        }
+
+        // Initial load
+        loadFiles();
+    </script>
+</body>
+</html>
