@@ -17,8 +17,10 @@
 #include <iostream>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 #include "../http/HTTPRequest.hpp"
 #include "../http/HTTPResponse.hpp"
@@ -56,7 +58,7 @@ public:
   bool cgiTimedOut;
   bool cgiOutputOverflow;
   bool cgiStripBody;
-  long long cgiStartMs;
+  struct timeval cgiStartTime;
   Client(int fd);
 };
 

@@ -18,8 +18,9 @@ Client::Client(int fd)
       streamBufferOffset(0), streamBufferSize(0), cgiActive(false), cgiPid(-1),
       cgiInFd(-1), cgiOutFd(-1), cgiInputOffset(0), cgiInputClosed(false),
       cgiOutputClosed(false), cgiExited(false), cgiExitStatus(0),
-      cgiTimedOut(false), cgiOutputOverflow(false), cgiStripBody(false),
-      cgiStartMs(0) {
+      cgiTimedOut(false), cgiOutputOverflow(false), cgiStripBody(false) {
+  cgiStartTime.tv_sec = 0;
+  cgiStartTime.tv_usec = 0;
   if (Logger::isDebugEnabled())
     Logger::debug("Client constructor called for FD: " + Helpers::toString(fd));
 

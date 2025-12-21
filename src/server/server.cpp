@@ -76,14 +76,14 @@ void logWriteFailure(Client *c, int fd, const char *callName) {
   }
 }
 
-const long long CGI_TIMEOUT_MS = 5000; // 5 second timeout for CGI execution
+const long CGI_TIMEOUT_MS = 5000; // 5 second timeout for CGI execution
 const size_t CGI_MAX_OUTPUT = 16 * 1024 * 1024; // 16 MB max CGI output buffer
 
-long long nowMs() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return static_cast<long long>(tv.tv_sec) * 1000 +
-         static_cast<long long>(tv.tv_usec) / 1000;
+long getElapsedMs(const struct timeval &start) {
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  return (now.tv_sec - start.tv_sec) * 1000 +
+         (now.tv_usec - start.tv_usec) / 1000;
 }
 
 void removeCgiFd(Server &server, int &fd) {
@@ -129,7 +129,8 @@ void resetCgiState(Client *c) {
   c->cgiTimedOut = false;
   c->cgiOutputOverflow = false;
   c->cgiStripBody = false;
-  c->cgiStartMs = 0;
+  c->cgiStartTime.tv_sec = 0;
+  c->cgiStartTime.tv_usec = 0;
 }
 
 void updateCgiExitStatus(Client *c) {
@@ -238,7 +239,7 @@ bool startCgi(Server &server, Client *c, const CgiTask &task) {
   c->cgiExitStatus = 0;
   c->cgiTimedOut = false;
   c->cgiStripBody = task.stripBody;
-  c->cgiStartMs = nowMs();
+  gettimeofday(&c->cgiStartTime, NULL);
 
   try {
     if (!c->cgiInput.empty()) {
@@ -582,16 +583,15 @@ void Server::handleCgiEvent(int fd, uint32_t events) {
 }
 
 int Server::nextCgiTimeoutMs() const {
-  long long now = nowMs();
-  long long minRemaining = -1;
+  long minRemaining = -1;
 
   for (std::map<int, Client *>::const_iterator it = clients.begin();
        it != clients.end(); ++it) {
     Client *c = it->second;
     if (c == NULL || !c->cgiActive)
       continue;
-    long long elapsed = now - c->cgiStartMs;
-    long long remaining = CGI_TIMEOUT_MS - elapsed;
+    long elapsed = getElapsedMs(c->cgiStartTime);
+    long remaining = CGI_TIMEOUT_MS - elapsed;
     if (remaining < 0)
       remaining = 0;
     if (minRemaining < 0 || remaining < minRemaining)
@@ -604,15 +604,13 @@ int Server::nextCgiTimeoutMs() const {
 }
 
 void Server::checkCgiTimeouts() {
-  long long now = nowMs();
-
   for (std::map<int, Client *>::iterator it = clients.begin();
        it != clients.end(); ++it) {
     Client *c = it->second;
     if (c == NULL || !c->cgiActive)
       continue;
 
-    if (!c->cgiTimedOut && now - c->cgiStartMs >= CGI_TIMEOUT_MS) {
+    if (!c->cgiTimedOut && getElapsedMs(c->cgiStartTime) >= CGI_TIMEOUT_MS) {
       c->cgiTimedOut = true;
       if (c->cgiPid > 0)
         kill(c->cgiPid, SIGKILL);
